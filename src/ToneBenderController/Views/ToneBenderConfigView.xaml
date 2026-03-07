@@ -1,0 +1,134 @@
+<UserControl x:Class="ToneBenderController.Views.ToneBenderConfigView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="{StaticResource BrConfigBg}">
+
+    <StackPanel Margin="16">
+
+        <!-- Header -->
+        <TextBlock Text="ToneBender Config"
+                   Style="{StaticResource SectionHeaderStyle}"
+                   Foreground="{StaticResource BrConfigHeader}" />
+
+        <!-- Image File Browse -->
+        <TextBlock Text="Image File" Style="{StaticResource FormLabelStyle}"
+                   FontWeight="Bold" Margin="0,0,0,6" />
+        <DockPanel Margin="0,0,0,4">
+            <Button DockPanel.Dock="Right"
+                    Command="{Binding BrowseImageCommand}"
+                    Style="{StaticResource RoundedButtonStyle}"
+                    Background="{StaticResource BrConfigBtn}"
+                    Padding="12,4" Margin="8,0,0,0">
+                <TextBlock Text="Browse..." FontFamily="Segoe UI" FontSize="12"
+                           FontWeight="Bold" Foreground="White" />
+            </Button>
+            <TextBox Text="{Binding ImageFilePath, Mode=OneWay}"
+                     IsReadOnly="True"
+                     Style="{StaticResource FormTextBoxStyle}" />
+        </DockPanel>
+        <TextBlock Text="{Binding FormatDisplay}"
+                   FontFamily="Consolas" FontSize="11"
+                   Foreground="{StaticResource BrConfigHeader}"
+                   FontWeight="Bold"
+                   Margin="0,0,0,12" />
+
+        <!-- Autopilot Settings -->
+        <TextBlock Text="Autopilot Settings" Style="{StaticResource FormLabelStyle}"
+                   FontWeight="Bold" Margin="0,0,0,6" />
+        <Border Background="White" BorderBrush="{StaticResource BrBorder}"
+                BorderThickness="1" Padding="12,10">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="110" />
+                    <ColumnDefinition Width="8" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="34" />
+                    <RowDefinition Height="34" />
+                    <RowDefinition Height="34" />
+                    <RowDefinition Height="34" />
+                    <RowDefinition Height="34" />
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="Display Title"
+                           Style="{StaticResource FormLabelStyle}" />
+                <TextBox Grid.Row="0" Grid.Column="2"
+                         Text="{Binding DisplayTitle}"
+                         Style="{StaticResource FormTextBoxStyle}" VerticalAlignment="Center" />
+
+                <TextBlock Grid.Row="1" Grid.Column="0" Text="Post Action"
+                           Style="{StaticResource FormLabelStyle}" />
+                <ComboBox Grid.Row="1" Grid.Column="2"
+                          ItemsSource="{Binding PostActionOptions}"
+                          SelectedItem="{Binding PostAction}"
+                          Style="{StaticResource FormComboBoxStyle}" VerticalAlignment="Center" />
+
+                <TextBlock Grid.Row="2" Grid.Column="0" Text="Target Disk"
+                           Style="{StaticResource FormLabelStyle}" />
+                <TextBox Grid.Row="2" Grid.Column="2"
+                         Text="{Binding TargetDisk}"
+                         Style="{StaticResource FormTextBoxStyle}" VerticalAlignment="Center" />
+
+                <!-- WIM Index — WIM only -->
+                <TextBlock Grid.Row="3" Grid.Column="0" Text="WIM Index">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock" BasedOn="{StaticResource FormLabelStyle}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsFFU}" Value="True">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+                <TextBox Grid.Row="3" Grid.Column="2"
+                         Text="{Binding WimIndex}"
+                         VerticalAlignment="Center">
+                    <TextBox.Style>
+                        <Style TargetType="TextBox" BasedOn="{StaticResource FormTextBoxStyle}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsFFU}" Value="True">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBox.Style>
+                </TextBox>
+
+                <!-- Data Partition — WIM only -->
+                <TextBlock Grid.Row="4" Grid.Column="0" Text="Data Partition">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock" BasedOn="{StaticResource FormLabelStyle}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsFFU}" Value="True">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+                <Grid Grid.Row="4" Grid.Column="2">
+                    <Grid.Style>
+                        <Style TargetType="Grid">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsFFU}" Value="True">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Grid.Style>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBox Grid.Column="0"
+                             Text="{Binding DataPartitionMB}"
+                             Style="{StaticResource FormTextBoxStyle}" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="1" Text="MB"
+                               Style="{StaticResource FormLabelStyle}" Margin="6,0,0,0" />
+                </Grid>
+            </Grid>
+        </Border>
+    </StackPanel>
+</UserControl>

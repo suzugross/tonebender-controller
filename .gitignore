@@ -1,0 +1,26 @@
+# Build outputs
+Output/
+
+# ToneBender inject files (from separate project)
+Inject/
+
+# .NET build artifacts
+bin/
+obj/
+*.user
+*.suo
+*.DotSettings.user
+
+# NuGet
+packages/
+
+# IDE
+.vs/
+.idea/
+*.swp
+*~
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store

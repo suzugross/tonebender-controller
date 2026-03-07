@@ -1,0 +1,43 @@
+{
+  "profile": "default",
+  "architecture": "amd64",
+  "workDir": "Output\\Work",
+  "output": {
+    "iso": true,
+    "isoPath": "Output\\WinPE.iso"
+  },
+  "packages": [
+    "WinPE-WMI",
+    "WinPE-RNDIS",
+    "WinPE-Dot3Svc",
+    "WinPE-EnhancedStorage",
+    "WinPE-WDS-Tools",
+    "WinPE-SecureStartup",
+    "WinPE-NetFx",
+    "WinPE-Scripting",
+    "WinPE-PowerShell",
+    "WinPE-DismCmdlets",
+    "WinPE-StorageWMI",
+    "WinPE-HTA",
+    "WinPE-FMAPI",
+    "WinPE-SecureBootCmdlets",
+    "WinPE-Fonts-Legacy",
+    "WinPE-FontSupport-JA-JP"
+  ],
+  "locale": {
+    "language": "ja-jp",
+    "inputLocale": "0411:00000411",
+    "layeredDriver": 6,
+    "timezone": "Tokyo Standard Time"
+  },
+  "inject": [
+    {
+      "source": "Inject\\CaptureTools",
+      "destination": "CaptureTools"
+    },
+    {
+      "source": "Inject\\startnet.cmd",
+      "destination": "Windows\\System32\\startnet.cmd"
+    }
+  ]
+}

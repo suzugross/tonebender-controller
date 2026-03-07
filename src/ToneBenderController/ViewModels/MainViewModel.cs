@@ -1,0 +1,273 @@
+using System.ComponentModel;
+using System.IO;
+using System.Windows;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using ToneBenderController.Models;
+using ToneBenderController.Services;
+
+namespace ToneBenderController.ViewModels;
+
+/// <summary>
+/// Tab navigation and build execution management.
+/// </summary>
+public partial class MainViewModel : ObservableObject
+{
+    private readonly UsbCreationViewModel _usbVm;
+    private readonly WinPeBuildViewModel _winPeVm;
+    private readonly ToneBenderConfigViewModel _configVm;
+    private readonly IDiskService _diskService;
+    private readonly IPowerShellService _psService;
+
+    [ObservableProperty]
+    private object _currentPage;
+
+    [ObservableProperty]
+    private string _statusText = "Ready";
+
+    [ObservableProperty]
+    private string _executeButtonText = "Execute";
+
+    public MainViewModel(
+        UsbCreationViewModel usbVm,
+        WinPeBuildViewModel winPeVm,
+        ToneBenderConfigViewModel configVm,
+        IDiskService diskService,
+        IPowerShellService psService)
+    {
+        _usbVm = usbVm;
+        _winPeVm = winPeVm;
+        _configVm = configVm;
+        _diskService = diskService;
+        _psService = psService;
+
+        _currentPage = _usbVm;
+
+        _winPeVm.PropertyChanged += OnWinPeVmPropertyChanged;
+    }
+
+    private void OnWinPeVmPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(WinPeBuildViewModel.IsBuilding))
+            UpdateExecuteButtonText();
+    }
+
+    partial void OnCurrentPageChanged(object value)
+    {
+        UpdateExecuteButtonText();
+    }
+
+    private void UpdateExecuteButtonText()
+    {
+        ExecuteButtonText = CurrentPage switch
+        {
+            WinPeBuildViewModel { IsBuilding: true } => "Cancel",
+            WinPeBuildViewModel { IsBuilding: false } => "Build WinPE",
+            ToneBenderConfigViewModel => "Save Config",
+            _ => "Execute"
+        };
+    }
+
+    [RelayCommand]
+    private void Navigate(string? page)
+    {
+        CurrentPage = page switch
+        {
+            "UsbCreation"      => _usbVm,
+            "WinPeBuild"       => _winPeVm,
+            "ToneBenderConfig" => _configVm,
+            _                  => CurrentPage
+        };
+    }
+
+    [RelayCommand]
+    private async Task ExecuteAsync()
+    {
+        switch (CurrentPage)
+        {
+            case UsbCreationViewModel usbVm:
+                await ExecuteUsbCreationAsync(usbVm);
+                break;
+            case WinPeBuildViewModel winPeVm:
+                await ExecuteWinPeBuildAsync(winPeVm);
+                break;
+            case ToneBenderConfigViewModel configVm:
+                await ExecuteConfigSaveAsync(configVm);
+                break;
+        }
+    }
+
+    private async Task ExecuteWinPeBuildAsync(WinPeBuildViewModel winPeVm)
+    {
+        if (winPeVm.IsBuilding)
+        {
+            winPeVm.CancelBuild();
+            StatusText = "Cancelling WinPE build...";
+            return;
+        }
+
+        if (winPeVm.SelectedProfile is null)
+        {
+            StatusText = "No profile selected.";
+            return;
+        }
+
+        StatusText = "Starting WinPE build...";
+        await winPeVm.RunBuildAsync();
+        StatusText = winPeVm.BuildStatus;
+    }
+
+    private async Task ExecuteConfigSaveAsync(ToneBenderConfigViewModel configVm)
+    {
+        if (string.IsNullOrEmpty(configVm.ConfigFilePath))
+        {
+            StatusText = "No image selected. Use Browse to select an image file.";
+            return;
+        }
+
+        try
+        {
+            await configVm.SaveConfigAsync();
+            StatusText = $"Config saved: {configVm.ConfigFilePath}";
+        }
+        catch (Exception ex)
+        {
+            StatusText = "Failed to save config.";
+            MessageBox.Show(
+                ex.Message,
+                "Save Error",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
+    }
+
+    private async Task ExecuteUsbCreationAsync(UsbCreationViewModel usbVm)
+    {
+        // ── Validation ──
+        if (usbVm.SelectedDrive == null)
+        {
+            StatusText = "No USB drive selected.";
+            return;
+        }
+
+        var currentDrives = await _diskService.GetUsbDrivesAsync();
+        if (!currentDrives.Any(d => d.DiskNumber == usbVm.SelectedDrive.DiskNumber))
+        {
+            StatusText = "Selected drive is no longer connected. Please refresh.";
+            return;
+        }
+
+        long requiredBytes = ((long)usbVm.WinPeSizeMB + usbVm.WinInstSizeMB + 1024) * 1024 * 1024;
+        if (usbVm.SelectedDrive.SizeBytes < requiredBytes)
+        {
+            StatusText = $"Drive too small. Need at least {requiredBytes / (1024 * 1024 * 1024)} GB.";
+            return;
+        }
+
+        // Resolve build profile and workspace media path
+        string profileName = _winPeVm.SelectedProfile ?? "default";
+        var profile = _winPeVm.CurrentProfile;
+        if (profile == null)
+        {
+            StatusText = "No WinPE build profile loaded. Check Profiles directory.";
+            return;
+        }
+
+        string workDir = Path.IsPathRooted(profile.WorkDir)
+            ? profile.WorkDir
+            : Path.Combine(_psService.ScriptDir, profile.WorkDir);
+        string mediaDir = Path.Combine(workDir, "media");
+
+        // ── Confirmation dialog — full pipeline ──
+        var result = MessageBox.Show(
+            $"WARNING: All data on Disk {usbVm.SelectedDrive.DiskNumber} " +
+            $"({usbVm.SelectedDrive.FriendlyName}, {usbVm.SelectedDrive.DisplaySize}) " +
+            $"will be permanently erased.\n\n" +
+            $"Pipeline:\n" +
+            $"  1. Partition USB drive\n" +
+            $"  2. Build WinPE (profile: {profileName})\n" +
+            $"  3. Deploy WinPE to USB\n\n" +
+            $"Partition layout:\n" +
+            $"  WINPE (FAT32): {usbVm.WinPeSizeMB} MB\n" +
+            $"  WININST (FAT32): {usbVm.WinInstSizeMB} MB\n" +
+            $"  DATA (NTFS): Remaining space\n\n" +
+            $"Continue?",
+            "Confirm USB Pipeline",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+
+        if (result != MessageBoxResult.Yes) return;
+
+        var config = new UsbPartitionConfig
+        {
+            WinPeSizeMB = usbVm.WinPeSizeMB,
+            WinInstSizeMB = usbVm.WinInstSizeMB,
+            DataUsesRemainingSpace = true
+        };
+
+        var progress = new Progress<string>(msg => StatusText = msg);
+
+        try
+        {
+            // ── Phase 1: Partition USB ──
+            StatusText = "[1/3] Partitioning USB drive...";
+            var partResult = await _diskService.PartitionDriveAsync(
+                usbVm.SelectedDrive.DiskNumber, config, progress);
+
+            if (!partResult.Success)
+            {
+                StatusText = "[1/3] Partitioning failed.";
+                MessageBox.Show(
+                    partResult.ErrorMessage ?? "Unknown error",
+                    "Partitioning Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+                return;
+            }
+
+            // ── Phase 2: Build WinPE ──
+            StatusText = "[2/3] Building WinPE...";
+            bool buildOk = await _winPeVm.RunBuildAsync();
+
+            if (!buildOk)
+            {
+                StatusText = "[2/3] WinPE build failed.";
+                MessageBox.Show(
+                    _winPeVm.BuildStatus,
+                    "WinPE Build Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+                return;
+            }
+
+            if (!Directory.Exists(mediaDir))
+            {
+                StatusText = "[2/3] Build completed but media directory not found.";
+                MessageBox.Show(
+                    $"Expected media directory not found:\n{mediaDir}",
+                    "Deploy Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+                return;
+            }
+
+            // ── Phase 3: Deploy WinPE to USB ──
+            StatusText = "[3/3] Deploying WinPE to USB...";
+            await _diskService.DeployWinPeAsync(
+                mediaDir, partResult.WinPeLetter, progress);
+
+            // ── Pipeline complete ──
+            StatusText = $"Pipeline complete! WINPE={partResult.WinPeLetter}:, " +
+                         $"WININST={partResult.WinInstLetter}:, DATA={partResult.DataLetter}:";
+        }
+        catch (Exception ex)
+        {
+            StatusText = "Pipeline error.";
+            MessageBox.Show(
+                ex.Message,
+                "Pipeline Error",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
+    }
+}
