@@ -36,6 +36,13 @@
         <Color x:Key="ClrConfigBtnHov">#FAA03C</Color>
         <Color x:Key="ClrConfigHeader">#B45A0A</Color>
 
+        <!-- Image Prep (Purple) -->
+        <Color x:Key="ClrImagePrepBg">#F0E6FF</Color>
+        <Color x:Key="ClrImagePrepAccent">#6E32C8</Color>
+        <Color x:Key="ClrImagePrepBtn">#7D46DC</Color>
+        <Color x:Key="ClrImagePrepBtnHov">#9164F0</Color>
+        <Color x:Key="ClrImagePrepHeader">#5A1EB4</Color>
+
         <!-- Execute -->
         <Color x:Key="ClrExecBtn">#64646E</Color>
         <Color x:Key="ClrExecBtnHov">#50505A</Color>
@@ -62,6 +69,11 @@
         <SolidColorBrush x:Key="BrConfigBtn" Color="{StaticResource ClrConfigBtn}" />
         <SolidColorBrush x:Key="BrConfigHeader" Color="{StaticResource ClrConfigHeader}" />
 
+        <SolidColorBrush x:Key="BrImagePrepBg" Color="{StaticResource ClrImagePrepBg}" />
+        <SolidColorBrush x:Key="BrImagePrepAccent" Color="{StaticResource ClrImagePrepAccent}" />
+        <SolidColorBrush x:Key="BrImagePrepBtn" Color="{StaticResource ClrImagePrepBtn}" />
+        <SolidColorBrush x:Key="BrImagePrepHeader" Color="{StaticResource ClrImagePrepHeader}" />
+
         <SolidColorBrush x:Key="BrExecBtn" Color="{StaticResource ClrExecBtn}" />
 
         <!-- ═══ ViewModel → View DataTemplate ═══ -->
@@ -73,6 +85,9 @@
         </DataTemplate>
         <DataTemplate DataType="{x:Type vm:ToneBenderConfigViewModel}">
             <views:ToneBenderConfigView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:ImagePrepViewModel}">
+            <views:ImagePrepView />
         </DataTemplate>
 
         <!-- ═══ Tab button — 3D raised with accent bar (like ToneBender mode buttons) ═══ -->

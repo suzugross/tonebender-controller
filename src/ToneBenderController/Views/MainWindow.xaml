@@ -77,6 +77,15 @@
                             <TextBlock Text="ToneBender Config" />
                         </StackPanel>
                     </Button>
+                    <Button Command="{Binding NavigateCommand}"
+                            CommandParameter="ImagePrep"
+                            Style="{StaticResource TabButtonStyle}">
+                        <StackPanel Orientation="Horizontal">
+                            <Rectangle Width="4" Height="14" Fill="{StaticResource BrImagePrepAccent}"
+                                       Margin="0,0,8,0" RadiusX="1" RadiusY="1" />
+                            <TextBlock Text="Image Prep" />
+                        </StackPanel>
+                    </Button>
                 </StackPanel>
             </DockPanel>
         </Border>

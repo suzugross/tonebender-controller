@@ -1,0 +1,124 @@
+<UserControl x:Class="ToneBenderController.Views.ImagePrepView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="{StaticResource BrImagePrepBg}">
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <TextBlock Grid.Row="0" Text="Image Prep"
+                   Style="{StaticResource SectionHeaderStyle}"
+                   Foreground="{StaticResource BrImagePrepHeader}" />
+
+        <!-- ISO Selection -->
+        <StackPanel Grid.Row="1" Margin="0,0,0,12">
+            <TextBlock Text="Windows ISO" Style="{StaticResource FormLabelStyle}"
+                       FontWeight="Bold" Margin="0,0,0,6" />
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBox Grid.Column="0" Text="{Binding IsoFilePath}"
+                         IsReadOnly="True"
+                         Style="{StaticResource FormTextBoxStyle}" />
+                <Button Grid.Column="1" Content="Browse..."
+                        Command="{Binding BrowseIsoCommand}"
+                        Style="{StaticResource RoundedButtonStyle}"
+                        Background="{StaticResource BrImagePrepBtn}"
+                        Padding="12,4" Margin="6,0,0,0" />
+                <Button Grid.Column="2" Content="Load Editions"
+                        Command="{Binding LoadEditionsCommand}"
+                        Style="{StaticResource RoundedButtonStyle}"
+                        Background="{StaticResource BrImagePrepBtn}"
+                        Padding="12,4" Margin="6,0,0,0" />
+            </Grid>
+        </StackPanel>
+
+        <!-- Editions DataGrid -->
+        <Border Grid.Row="2" Background="White"
+                BorderBrush="{StaticResource BrBorder}"
+                BorderThickness="1" Margin="0,0,0,12">
+            <DataGrid ItemsSource="{Binding Editions}"
+                      SelectedItem="{Binding SelectedEdition}"
+                      AutoGenerateColumns="False"
+                      IsReadOnly="True"
+                      SelectionMode="Single"
+                      HeadersVisibility="Column"
+                      GridLinesVisibility="Horizontal"
+                      BorderThickness="0"
+                      CanUserSortColumns="False"
+                      CanUserReorderColumns="False"
+                      CanUserResizeRows="False"
+                      Background="White"
+                      RowBackground="White"
+                      AlternatingRowBackground="#FAFAFA"
+                      FontFamily="Segoe UI" FontSize="12">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Index" Binding="{Binding Index}" Width="60" />
+                    <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*" />
+                    <DataGridTextColumn Header="Description" Binding="{Binding Description}" Width="*" />
+                    <DataGridTextColumn Header="Size" Binding="{Binding DisplaySize}" Width="80" />
+                </DataGrid.Columns>
+            </DataGrid>
+        </Border>
+
+        <!-- Output settings -->
+        <StackPanel Grid.Row="3" Margin="0,0,0,12">
+            <TextBlock Text="Output" Style="{StaticResource FormLabelStyle}"
+                       FontWeight="Bold" Margin="0,0,0,6" />
+            <Grid Margin="0,0,0,6">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="80" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="Directory"
+                           Style="{StaticResource FormLabelStyle}" />
+                <TextBox Grid.Column="1" Text="{Binding OutputDirectory}"
+                         IsReadOnly="True"
+                         Style="{StaticResource FormTextBoxStyle}" />
+                <Button Grid.Column="2" Content="..."
+                        Command="{Binding BrowseOutputDirectoryCommand}"
+                        Style="{StaticResource RoundedButtonStyle}"
+                        Background="{StaticResource BrImagePrepBtn}"
+                        Padding="10,4" Margin="6,0,0,0" />
+            </Grid>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="80" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="Filename"
+                           Style="{StaticResource FormLabelStyle}" />
+                <TextBox Grid.Column="1" Text="{Binding OutputFileName, UpdateSourceTrigger=PropertyChanged}"
+                         Style="{StaticResource FormTextBoxStyle}" />
+            </Grid>
+        </StackPanel>
+
+        <!-- Progress -->
+        <Border Grid.Row="4" Background="White" BorderBrush="{StaticResource BrBorder}"
+                BorderThickness="1" Padding="12,8">
+            <StackPanel>
+                <ProgressBar Value="{Binding ExportProgress}"
+                             Maximum="100" Height="18"
+                             Foreground="{StaticResource BrImagePrepAccent}"
+                             Background="#E0E0E0"
+                             BorderBrush="{StaticResource BrBorder}"
+                             BorderThickness="1"
+                             Margin="0,0,0,6" />
+                <TextBlock Text="{Binding StatusText}"
+                           FontFamily="Segoe UI" FontSize="11"
+                           Foreground="{StaticResource BrTextGray}" />
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

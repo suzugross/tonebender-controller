@@ -16,6 +16,7 @@ public partial class MainViewModel : ObservableObject
     private readonly UsbCreationViewModel _usbVm;
     private readonly WinPeBuildViewModel _winPeVm;
     private readonly ToneBenderConfigViewModel _configVm;
+    private readonly ImagePrepViewModel _imagePrepVm;
     private readonly IDiskService _diskService;
     private readonly IPowerShellService _psService;
 
@@ -32,29 +33,37 @@ public partial class MainViewModel : ObservableObject
         UsbCreationViewModel usbVm,
         WinPeBuildViewModel winPeVm,
         ToneBenderConfigViewModel configVm,
+        ImagePrepViewModel imagePrepVm,
         IDiskService diskService,
         IPowerShellService psService)
     {
         _usbVm = usbVm;
         _winPeVm = winPeVm;
         _configVm = configVm;
+        _imagePrepVm = imagePrepVm;
         _diskService = diskService;
         _psService = psService;
 
         _currentPage = _usbVm;
 
-        _winPeVm.PropertyChanged += OnWinPeVmPropertyChanged;
+        _winPeVm.PropertyChanged += OnChildVmPropertyChanged;
+        _imagePrepVm.PropertyChanged += OnChildVmPropertyChanged;
     }
 
-    private void OnWinPeVmPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    private void OnChildVmPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(WinPeBuildViewModel.IsBuilding))
+        if (e.PropertyName is nameof(WinPeBuildViewModel.IsBuilding)
+                           or nameof(ImagePrepViewModel.IsExporting))
             UpdateExecuteButtonText();
     }
 
-    partial void OnCurrentPageChanged(object value)
+    partial void OnCurrentPageChanged(object? oldValue, object newValue)
     {
         UpdateExecuteButtonText();
+
+        // Unmount ISO when navigating away from Image Prep
+        if (oldValue is ImagePrepViewModel && _imagePrepVm.IsMounted)
+            _ = _imagePrepVm.UnmountAsync();
     }
 
     private void UpdateExecuteButtonText()
@@ -64,6 +73,8 @@ public partial class MainViewModel : ObservableObject
             WinPeBuildViewModel { IsBuilding: true } => "Cancel",
             WinPeBuildViewModel { IsBuilding: false } => "Build WinPE",
             ToneBenderConfigViewModel => "Save Config",
+            ImagePrepViewModel { IsExporting: true } => "Cancel",
+            ImagePrepViewModel { IsExporting: false } => "Export WIM",
             _ => "Execute"
         };
     }
@@ -76,6 +87,7 @@ public partial class MainViewModel : ObservableObject
             "UsbCreation"      => _usbVm,
             "WinPeBuild"       => _winPeVm,
             "ToneBenderConfig" => _configVm,
+            "ImagePrep"        => _imagePrepVm,
             _                  => CurrentPage
         };
     }
@@ -93,6 +105,9 @@ public partial class MainViewModel : ObservableObject
                 break;
             case ToneBenderConfigViewModel configVm:
                 await ExecuteConfigSaveAsync(configVm);
+                break;
+            case ImagePrepViewModel imagePrepVm:
+                await ExecuteImagePrepAsync(imagePrepVm);
                 break;
         }
     }
@@ -139,6 +154,38 @@ public partial class MainViewModel : ObservableObject
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
         }
+    }
+
+    private async Task ExecuteImagePrepAsync(ImagePrepViewModel imagePrepVm)
+    {
+        if (imagePrepVm.IsExporting)
+        {
+            imagePrepVm.CancelExport();
+            StatusText = "Cancelling export...";
+            return;
+        }
+
+        if (imagePrepVm.SelectedEdition is null)
+        {
+            StatusText = "No edition selected. Load editions from an ISO first.";
+            return;
+        }
+
+        if (string.IsNullOrEmpty(imagePrepVm.OutputDirectory))
+        {
+            StatusText = "No output directory selected.";
+            return;
+        }
+
+        StatusText = "Exporting WIM...";
+        bool ok = await imagePrepVm.ExportAsync();
+        StatusText = imagePrepVm.StatusText;
+    }
+
+    public async Task CleanupAsync()
+    {
+        if (_imagePrepVm.IsMounted)
+            await _imagePrepVm.UnmountAsync();
     }
 
     private async Task ExecuteUsbCreationAsync(UsbCreationViewModel usbVm)

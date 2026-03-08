@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Windows;
 using ToneBenderController.ViewModels;
 
@@ -9,5 +10,12 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         DataContext = viewModel;
+        Closing += OnClosing;
+    }
+
+    private async void OnClosing(object? sender, CancelEventArgs e)
+    {
+        if (DataContext is MainViewModel vm)
+            await vm.CleanupAsync();
     }
 }

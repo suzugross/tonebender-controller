@@ -33,11 +33,13 @@ public partial class App : Application
         services.AddSingleton<IPowerShellService, PowerShellService>();
         services.AddSingleton<IProfileService, ProfileService>();
         services.AddSingleton<IAutopilotService, AutopilotService>();
+        services.AddSingleton<IWindowsImageService, WindowsImageService>();
 
         // --- ViewModels (Singleton) ---
         services.AddSingleton<UsbCreationViewModel>();
         services.AddSingleton<WinPeBuildViewModel>();
         services.AddSingleton<ToneBenderConfigViewModel>();
+        services.AddSingleton<ImagePrepViewModel>();
         services.AddSingleton<MainViewModel>();
 
         // --- Views (Transient) ---
