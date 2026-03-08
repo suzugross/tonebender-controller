@@ -1,6 +1,8 @@
 using System.Collections.ObjectModel;
 using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using Microsoft.Win32;
 using ToneBenderController.Models;
 using ToneBenderController.Services;
 
@@ -36,6 +38,9 @@ public partial class WinPeBuildViewModel : ObservableObject
 
     [ObservableProperty]
     private string _profileDetail = "";
+
+    [ObservableProperty]
+    private string _driverDirectory = "";
 
     public WinPeBuildViewModel(IProfileService profileService, IPowerShellService psService)
     {
@@ -79,6 +84,23 @@ public partial class WinPeBuildViewModel : ObservableObject
         ProfileDetail = $"{value.Architecture} | {value.Packages.Count} packages | {value.Output.IsoPath}";
     }
 
+    [RelayCommand]
+    private void BrowseDriverDirectory()
+    {
+        var dialog = new OpenFolderDialog
+        {
+            Title = "Select OEM Driver Directory"
+        };
+        if (dialog.ShowDialog() == true)
+            DriverDirectory = dialog.FolderName;
+    }
+
+    [RelayCommand]
+    private void ClearDriverDirectory()
+    {
+        DriverDirectory = "";
+    }
+
     public async Task<bool> RunBuildAsync()
     {
         if (SelectedProfile is null || IsBuilding) return false;
@@ -102,7 +124,8 @@ public partial class WinPeBuildViewModel : ObservableObject
         try
         {
             var profilePath = Path.Combine(_profilesDir, SelectedProfile + ".json");
-            await _psService.RunBuildAsync(profilePath, progress, _buildCts.Token);
+            string? driverPath = string.IsNullOrEmpty(DriverDirectory) ? null : DriverDirectory;
+            await _psService.RunBuildAsync(profilePath, driverPath, progress, _buildCts.Token);
 
             BuildProgress = 100;
             BuildStatus = "Build complete!";

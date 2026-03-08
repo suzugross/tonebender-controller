@@ -27,6 +27,7 @@ public partial class UsbCreationViewModel : ObservableObject
     public UsbCreationViewModel(IDiskService diskService)
     {
         _diskService = diskService;
+        _ = RefreshDrivesAsync();
     }
 
     [RelayCommand]

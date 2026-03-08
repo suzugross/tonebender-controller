@@ -173,4 +173,33 @@ function Set-PEExecutionPolicy {
     }
 }
 
-Export-ModuleMember -Function Add-PEPackages, Set-PELocale, Set-PEExecutionPolicy
+function Add-PEDrivers {
+    <#
+    .SYNOPSIS
+        Add OEM drivers to a mounted WIM image using DISM /Add-Driver /Recurse.
+    .PARAMETER MountDir
+        WIM mount directory (parent of "mount" subdirectory)
+    .PARAMETER DriverPath
+        Path to directory containing .inf driver files (searched recursively)
+    #>
+    param(
+        [Parameter(Mandatory)][string]$MountDir,
+        [Parameter(Mandatory)][string]$DriverPath
+    )
+
+    if (-not (Test-Path $DriverPath)) {
+        throw "Driver directory not found: $DriverPath"
+    }
+
+    $mountPath = Join-Path $MountDir "mount"
+    $dism = "$env:SystemRoot\System32\dism.exe"
+
+    Write-Verbose "Adding OEM drivers from: $DriverPath"
+    & $dism /Image:"$mountPath" /Add-Driver /Driver:"$DriverPath" /Recurse
+    if ($LASTEXITCODE -ne 0) {
+        throw "DISM /Add-Driver failed (ExitCode: $LASTEXITCODE)"
+    }
+    Write-Verbose "OEM drivers added successfully."
+}
+
+Export-ModuleMember -Function Add-PEPackages, Set-PELocale, Set-PEExecutionPolicy, Add-PEDrivers

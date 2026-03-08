@@ -47,6 +47,9 @@ public partial class ImagePrepViewModel : ObservableObject
     [ObservableProperty]
     private string _statusText = "";
 
+    [ObservableProperty]
+    private string _driverDirectory = "";
+
     public ImagePrepViewModel(IWindowsImageService imageService)
     {
         _imageService = imageService;
@@ -133,6 +136,23 @@ public partial class ImagePrepViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private void BrowseDriverDirectory()
+    {
+        var dialog = new OpenFolderDialog
+        {
+            Title = "Select OEM Driver Directory"
+        };
+        if (dialog.ShowDialog() == true)
+            DriverDirectory = dialog.FolderName;
+    }
+
+    [RelayCommand]
+    private void ClearDriverDirectory()
+    {
+        DriverDirectory = "";
+    }
+
+    [RelayCommand]
     private void BrowseOutputDirectory()
     {
         var dialog = new OpenFolderDialog
@@ -178,12 +198,30 @@ public partial class ImagePrepViewModel : ObservableObject
 
         try
         {
-            string destPath = Path.Combine(OutputDirectory, OutputFileName);
+            // Create ToneBender-compatible timestamped subdirectory:
+            //   [IMAGE]/YYYY_MM_DD_HHMMSS_ImageName/ImageName.wim
+            string imageName = Path.GetFileNameWithoutExtension(OutputFileName);
+            string timestamp = DateTime.Now.ToString("yyyy_MM_dd_HHmmss");
+            string subDirName = $"{timestamp}_{imageName}";
+            string subDir = Path.Combine(OutputDirectory, subDirName);
+            Directory.CreateDirectory(subDir);
+
+            string destPath = Path.Combine(subDir, OutputFileName);
             await _imageService.ExportEditionAsync(
                 _wimFilePath, SelectedEdition.Index, destPath, progress, _exportCts.Token);
 
             ExportProgress = 100;
-            StatusText = $"Export complete: {OutputFileName}";
+
+            // Inject OEM drivers if a driver directory is specified
+            if (!string.IsNullOrEmpty(DriverDirectory))
+            {
+                StatusText = "Injecting OEM drivers...";
+                var driverProgress = new Progress<string>(msg => StatusText = msg);
+                await _imageService.InjectDriversIntoWimAsync(
+                    destPath, DriverDirectory, driverProgress, _exportCts.Token);
+            }
+
+            StatusText = $"Export complete: {subDirName}\\{OutputFileName}";
             return true;
         }
         catch (OperationCanceledException)

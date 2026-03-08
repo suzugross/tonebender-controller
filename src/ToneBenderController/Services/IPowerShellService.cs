@@ -11,5 +11,6 @@ public interface IPowerShellService
     string ScriptDir { get; }
 
     /// <summary>Run the WinPE build script with the specified profile.</summary>
-    Task RunBuildAsync(string profilePath, IProgress<BuildProgress>? progress = null, CancellationToken ct = default);
+    Task RunBuildAsync(string profilePath, string? driverPath = null,
+        IProgress<BuildProgress>? progress = null, CancellationToken ct = default);
 }

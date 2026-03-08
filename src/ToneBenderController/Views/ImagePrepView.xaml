@@ -10,6 +10,7 @@
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <!-- Header -->
@@ -104,8 +105,43 @@
             </Grid>
         </StackPanel>
 
+        <!-- OEM Drivers (optional) -->
+        <StackPanel Grid.Row="4" Margin="0,0,0,12">
+            <TextBlock Text="OEM Drivers" Style="{StaticResource FormLabelStyle}"
+                       FontWeight="Bold" Margin="0,0,0,6" />
+            <DockPanel>
+                <Button DockPanel.Dock="Right" Content="Clear"
+                        Command="{Binding ClearDriverDirectoryCommand}"
+                        Style="{StaticResource RoundedButtonStyle}"
+                        Background="{StaticResource BrExecBtn}"
+                        Padding="10,4" Margin="4,0,0,0" />
+                <Button DockPanel.Dock="Right" Content="Browse..."
+                        Command="{Binding BrowseDriverDirectoryCommand}"
+                        Style="{StaticResource RoundedButtonStyle}"
+                        Background="{StaticResource BrImagePrepBtn}"
+                        Padding="10,4" Margin="4,0,0,0" />
+                <TextBox Text="{Binding DriverDirectory}"
+                         Style="{StaticResource FormTextBoxStyle}"
+                         IsReadOnly="True" />
+            </DockPanel>
+            <TextBlock FontFamily="Segoe UI" FontSize="11"
+                       Foreground="{StaticResource BrTextGray}"
+                       Margin="0,4,0,0">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="Text" Value="Drivers will be injected into the exported WIM." />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding DriverDirectory}" Value="">
+                                <Setter Property="Text" Value="(none — driver injection will be skipped)" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+        </StackPanel>
+
         <!-- Progress -->
-        <Border Grid.Row="4" Background="White" BorderBrush="{StaticResource BrBorder}"
+        <Border Grid.Row="5" Background="White" BorderBrush="{StaticResource BrBorder}"
                 BorderThickness="1" Padding="12,8">
             <StackPanel>
                 <ProgressBar Value="{Binding ExportProgress}"

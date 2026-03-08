@@ -93,13 +93,13 @@ public class WindowsImageService : IWindowsImageService
             ?? throw new InvalidOperationException("Failed to start dism.exe.");
 
         // Read stdout line-by-line for progress parsing
+        // NOTE: Do NOT use EndOfStream — it is a synchronous blocking property
+        // that freezes the UI thread when DISM output is infrequent (e.g. USB writes).
         int lastReported = -1;
-        while (!process.StandardOutput.EndOfStream)
+        string? line;
+        while ((line = await process.StandardOutput.ReadLineAsync()) != null)
         {
             ct.ThrowIfCancellationRequested();
-
-            string? line = await process.StandardOutput.ReadLineAsync();
-            if (line == null) break;
 
             // Parse progress: "[ 58.3% ]" or "[==== 58.3% ====]"
             var match = Regex.Match(line, @"\[\s*=*\s*(\d+[\.,]\d+)\s*%\s*=*\s*\]");
@@ -134,6 +134,86 @@ public class WindowsImageService : IWindowsImageService
                 $"DISM /Export-Image failed (exit code {process.ExitCode}).");
 
         progress?.Report(100);
+    }
+
+    public async Task InjectDriversIntoWimAsync(
+        string wimPath, string driverPath,
+        IProgress<string>? progress = null, CancellationToken ct = default)
+    {
+        if (!File.Exists(wimPath))
+            throw new FileNotFoundException("WIM file not found.", wimPath);
+        if (!Directory.Exists(driverPath))
+            throw new DirectoryNotFoundException($"Driver directory not found: {driverPath}");
+
+        // Create temporary mount directory next to the WIM
+        string mountDir = Path.Combine(
+            Path.GetDirectoryName(wimPath)!,
+            "_drvmount_" + Path.GetRandomFileName());
+        Directory.CreateDirectory(mountDir);
+
+        try
+        {
+            // Mount WIM (index 1 — exported WIM always has a single index)
+            progress?.Report("Mounting WIM for driver injection...");
+            ct.ThrowIfCancellationRequested();
+
+            var (mountExit, _, mountErr) = await RunProcessAsync(
+                "dism.exe",
+                $"/Mount-Wim /WimFile:\"{wimPath}\" /Index:1 /MountDir:\"{mountDir}\"",
+                timeoutMs: 120_000);
+
+            if (mountExit != 0)
+                throw new InvalidOperationException(
+                    $"DISM /Mount-Wim failed (exit code {mountExit}):\n{mountErr}");
+
+            // Inject drivers
+            progress?.Report("Injecting OEM drivers...");
+            ct.ThrowIfCancellationRequested();
+
+            var (drvExit, drvOut, drvErr) = await RunProcessAsync(
+                "dism.exe",
+                $"/Image:\"{mountDir}\" /Add-Driver /Driver:\"{driverPath}\" /Recurse",
+                timeoutMs: 300_000);
+
+            if (drvExit != 0)
+                throw new InvalidOperationException(
+                    $"DISM /Add-Driver failed (exit code {drvExit}):\n{drvOut}\n{drvErr}");
+
+            // Unmount with commit
+            progress?.Report("Unmounting WIM (commit)...");
+            ct.ThrowIfCancellationRequested();
+
+            var (unmountExit, _, unmountErr) = await RunProcessAsync(
+                "dism.exe",
+                $"/Unmount-Wim /MountDir:\"{mountDir}\" /Commit",
+                timeoutMs: 120_000);
+
+            if (unmountExit != 0)
+                throw new InvalidOperationException(
+                    $"DISM /Unmount-Wim failed (exit code {unmountExit}):\n{unmountErr}");
+
+            progress?.Report("Driver injection complete.");
+        }
+        catch
+        {
+            // Best-effort discard unmount on failure
+            try
+            {
+                await RunProcessAsync(
+                    "dism.exe",
+                    $"/Unmount-Wim /MountDir:\"{mountDir}\" /Discard",
+                    timeoutMs: 60_000);
+            }
+            catch { /* swallow */ }
+
+            throw;
+        }
+        finally
+        {
+            // Clean up temp mount directory
+            try { if (Directory.Exists(mountDir)) Directory.Delete(mountDir, true); }
+            catch { /* swallow */ }
+        }
     }
 
     // ── Private helpers ──────────────────────────────────────────

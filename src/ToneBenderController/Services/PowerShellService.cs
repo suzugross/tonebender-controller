@@ -22,15 +22,20 @@ public class PowerShellService : IPowerShellService
 
     public async Task RunBuildAsync(
         string profilePath,
+        string? driverPath = null,
         IProgress<BuildProgress>? progress = null,
         CancellationToken ct = default)
     {
         var scriptPath = Path.Combine(ScriptDir, "tonebender.ps1");
 
+        var args = $"-NoProfile -ExecutionPolicy Bypass -File \"{scriptPath}\" -ProfilePath \"{profilePath}\"";
+        if (!string.IsNullOrEmpty(driverPath))
+            args += $" -DriverPath \"{driverPath}\"";
+
         var psi = new ProcessStartInfo
         {
             FileName = "powershell.exe",
-            Arguments = $"-NoProfile -ExecutionPolicy Bypass -File \"{scriptPath}\" -ProfilePath \"{profilePath}\"",
+            Arguments = args,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,

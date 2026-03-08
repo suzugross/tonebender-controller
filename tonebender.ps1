@@ -15,7 +15,8 @@
 
 param(
     [Parameter(Mandatory)]
-    [string]$ProfilePath
+    [string]$ProfilePath,
+    [string]$DriverPath = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -161,6 +162,13 @@ try {
     Write-BuildLog -Step 7 -Total $TOTAL_STEPS -Message "Setting ExecutionPolicy to Bypass..." -Status "info"
     Set-PEExecutionPolicy -MountDir $mountDir -Policy "Bypass" -Verbose:$VerbosePreference
     Write-BuildLog -Step 7 -Total $TOTAL_STEPS -Message "ExecutionPolicy set to Bypass" -Status "success"
+
+    # --- OEM Drivers ---
+    if ($DriverPath -ne "") {
+        Write-BuildLog -Step 7 -Total $TOTAL_STEPS -Message "Adding OEM drivers from: $DriverPath" -Status "info"
+        Add-PEDrivers -MountDir $profile.workDir -DriverPath $DriverPath -Verbose:$VerbosePreference
+        Write-BuildLog -Step 7 -Total $TOTAL_STEPS -Message "OEM drivers added" -Status "success"
+    }
 
     # --- Inject files into WIM ---
     # Wrap in @() to ensure array even with single JSON element (PS 5.1 compat)
