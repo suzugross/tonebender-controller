@@ -46,7 +46,6 @@
                 <Grid.RowDefinitions>
                     <RowDefinition Height="34" />
                     <RowDefinition Height="34" />
-                    <RowDefinition Height="34" />
                 </Grid.RowDefinitions>
 
                 <TextBlock Grid.Row="0" Grid.Column="0" Text="WINPE (FAT32)"
@@ -57,17 +56,9 @@
                 <TextBlock Grid.Row="0" Grid.Column="2" Text="MB"
                            Style="{StaticResource FormLabelStyle}" Margin="6,0,0,0" />
 
-                <TextBlock Grid.Row="1" Grid.Column="0" Text="WININST (FAT32)"
+                <TextBlock Grid.Row="1" Grid.Column="0" Text="DATA (NTFS)"
                            Style="{StaticResource FormLabelStyle}" />
-                <TextBox Grid.Row="1" Grid.Column="1"
-                         Text="{Binding WinInstSizeMB}"
-                         Style="{StaticResource FormTextBoxStyle}" VerticalAlignment="Center" />
-                <TextBlock Grid.Row="1" Grid.Column="2" Text="MB"
-                           Style="{StaticResource FormLabelStyle}" Margin="6,0,0,0" />
-
-                <TextBlock Grid.Row="2" Grid.Column="0" Text="DATA (NTFS)"
-                           Style="{StaticResource FormLabelStyle}" />
-                <TextBlock Grid.Row="2" Grid.Column="1"
+                <TextBlock Grid.Row="1" Grid.Column="1"
                            Text="Remaining space"
                            Foreground="{StaticResource BrTextGray}"
                            FontFamily="Segoe UI" FontSize="13" FontStyle="Italic"

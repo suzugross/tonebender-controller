@@ -204,7 +204,7 @@ public partial class MainViewModel : ObservableObject
             return;
         }
 
-        long requiredBytes = ((long)usbVm.WinPeSizeMB + usbVm.WinInstSizeMB + 1024) * 1024 * 1024;
+        long requiredBytes = ((long)usbVm.WinPeSizeMB + 1024) * 1024 * 1024;
         if (usbVm.SelectedDrive.SizeBytes < requiredBytes)
         {
             StatusText = $"Drive too small. Need at least {requiredBytes / (1024 * 1024 * 1024)} GB.";
@@ -236,7 +236,6 @@ public partial class MainViewModel : ObservableObject
             $"  3. Deploy WinPE to USB\n\n" +
             $"Partition layout:\n" +
             $"  WINPE (FAT32): {usbVm.WinPeSizeMB} MB\n" +
-            $"  WININST (FAT32): {usbVm.WinInstSizeMB} MB\n" +
             $"  DATA (NTFS): Remaining space\n\n" +
             $"Continue?",
             "Confirm USB Pipeline",
@@ -248,7 +247,6 @@ public partial class MainViewModel : ObservableObject
         var config = new UsbPartitionConfig
         {
             WinPeSizeMB = usbVm.WinPeSizeMB,
-            WinInstSizeMB = usbVm.WinInstSizeMB,
             DataUsesRemainingSpace = true
         };
 
@@ -305,7 +303,7 @@ public partial class MainViewModel : ObservableObject
 
             // ── Pipeline complete ──
             StatusText = $"Pipeline complete! WINPE={partResult.WinPeLetter}:, " +
-                         $"WININST={partResult.WinInstLetter}:, DATA={partResult.DataLetter}:";
+                         $"DATA={partResult.DataLetter}:";
         }
         catch (Exception ex)
         {

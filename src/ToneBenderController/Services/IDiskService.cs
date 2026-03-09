@@ -10,7 +10,7 @@ public interface IDiskService
     /// <summary>Enumerate connected USB removable drives.</summary>
     Task<List<UsbDriveInfo>> GetUsbDrivesAsync();
 
-    /// <summary>Partition a USB drive with WINPE/WININST/DATA layout.</summary>
+    /// <summary>Partition a USB drive with WINPE/DATA layout.</summary>
     Task<UsbPartitionResult> PartitionDriveAsync(int diskNumber, UsbPartitionConfig config, IProgress<string>? progress = null);
 
     /// <summary>Detect whether the system uses UEFI (true) or BIOS (false) firmware.</summary>

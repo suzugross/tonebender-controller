@@ -21,9 +21,6 @@ public partial class UsbCreationViewModel : ObservableObject
     [ObservableProperty]
     private int _winPeSizeMB = 2048;
 
-    [ObservableProperty]
-    private int _winInstSizeMB = 8192;
-
     public UsbCreationViewModel(IDiskService diskService)
     {
         _diskService = diskService;

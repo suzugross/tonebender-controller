@@ -93,8 +93,6 @@ public class DiskService : IDiskService
 
         char winPeLetter = FindAvailableLetter(['P', 'S', 'T', 'U'], usedLetters);
         usedLetters.Add(winPeLetter);
-        char winInstLetter = FindAvailableLetter(['Q', 'V', 'W', 'X'], usedLetters);
-        usedLetters.Add(winInstLetter);
         char dataLetter = FindAvailableLetter(['R', 'Y', 'Z', 'N'], usedLetters);
 
         // Disable automount to prevent Windows from locking partitions during format
@@ -108,7 +106,7 @@ public class DiskService : IDiskService
             // No "convert gpt/mbr" needed — diskpart auto-initializes as MBR.
             // No "offline/online disk" — not supported on removable media.
             string script = BuildPartitionScript(diskNumber, config,
-                winPeLetter, winInstLetter, dataLetter);
+                winPeLetter, dataLetter);
 
             var (exitCode, output) = await RunDiskpartScriptAsync(script);
             if (exitCode != 0 || HasDiskpartError(output))
@@ -145,7 +143,6 @@ public class DiskService : IDiskService
         {
             Success = true,
             WinPeLetter = winPeLetter,
-            WinInstLetter = winInstLetter,
             DataLetter = dataLetter
         };
     }
@@ -206,7 +203,7 @@ public class DiskService : IDiskService
 
     private static string BuildPartitionScript(
         int diskNumber, UsbPartitionConfig config,
-        char winPeLetter, char winInstLetter, char dataLetter)
+        char winPeLetter, char dataLetter)
     {
         // Single script: clean → create partitions → format → assign.
         // After "clean", diskpart auto-initializes as MBR on first "create partition".
@@ -218,9 +215,6 @@ public class DiskService : IDiskService
             $"create partition primary size={config.WinPeSizeMB}",
             "format quick fs=fat32 label=\"WINPE\"",
             $"assign letter={winPeLetter}",
-            $"create partition primary size={config.WinInstSizeMB}",
-            "format quick fs=fat32 label=\"WININST\"",
-            $"assign letter={winInstLetter}",
             "create partition primary",
             "format quick fs=ntfs label=\"DATA\"",
             $"assign letter={dataLetter}",
