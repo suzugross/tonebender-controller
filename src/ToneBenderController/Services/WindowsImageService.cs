@@ -145,26 +145,30 @@ public class WindowsImageService : IWindowsImageService
         if (!Directory.Exists(driverPath))
             throw new DirectoryNotFoundException($"Driver directory not found: {driverPath}");
 
-        // Create temporary mount directory next to the WIM
+        // Create temporary mount directory on LOCAL disk (not next to WIM —
+        // DISM /Mount-Wim requires a local NTFS path; fails on USB/removable media).
         string mountDir = Path.Combine(
-            Path.GetDirectoryName(wimPath)!,
+            Path.GetTempPath(),
             "_drvmount_" + Path.GetRandomFileName());
         Directory.CreateDirectory(mountDir);
 
         try
         {
+            // Clean up any stale DISM mounts before proceeding
+            await RunProcessAsync("dism.exe", "/Cleanup-Wim", timeoutMs: 30_000);
+
             // Mount WIM (index 1 — exported WIM always has a single index)
             progress?.Report("Mounting WIM for driver injection...");
             ct.ThrowIfCancellationRequested();
 
-            var (mountExit, _, mountErr) = await RunProcessAsync(
+            var (mountExit, mountOut, mountErr) = await RunProcessAsync(
                 "dism.exe",
                 $"/Mount-Wim /WimFile:\"{wimPath}\" /Index:1 /MountDir:\"{mountDir}\"",
                 timeoutMs: 120_000);
 
             if (mountExit != 0)
                 throw new InvalidOperationException(
-                    $"DISM /Mount-Wim failed (exit code {mountExit}):\n{mountErr}");
+                    $"DISM /Mount-Wim failed (exit code {mountExit}):\n{mountOut}\n{mountErr}");
 
             // Inject drivers
             progress?.Report("Injecting OEM drivers...");
@@ -183,14 +187,14 @@ public class WindowsImageService : IWindowsImageService
             progress?.Report("Unmounting WIM (commit)...");
             ct.ThrowIfCancellationRequested();
 
-            var (unmountExit, _, unmountErr) = await RunProcessAsync(
+            var (unmountExit, unmountOut, unmountErr) = await RunProcessAsync(
                 "dism.exe",
                 $"/Unmount-Wim /MountDir:\"{mountDir}\" /Commit",
-                timeoutMs: 120_000);
+                timeoutMs: 600_000);
 
             if (unmountExit != 0)
                 throw new InvalidOperationException(
-                    $"DISM /Unmount-Wim failed (exit code {unmountExit}):\n{unmountErr}");
+                    $"DISM /Unmount-Wim failed (exit code {unmountExit}):\n{unmountOut}\n{unmountErr}");
 
             progress?.Report("Driver injection complete.");
         }

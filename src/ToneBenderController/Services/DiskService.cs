@@ -119,6 +119,15 @@ public class DiskService : IDiskService
                     ErrorMessage = $"Partitioning failed:\n{output}"
                 };
             }
+
+            // Best-effort: set WINPE partition as active for Legacy BIOS/CSM boot.
+            // "active" is unsupported on some removable USB media — failure is harmless.
+            try
+            {
+                await RunDiskpartScriptAsync(
+                    $"select disk {diskNumber}\r\nselect partition 1\r\nactive\r\nexit\r\n");
+            }
+            catch { /* swallow — UEFI doesn't need active flag */ }
         }
         finally
         {
@@ -201,7 +210,6 @@ public class DiskService : IDiskService
     {
         // Single script: clean → create partitions → format → assign.
         // After "clean", diskpart auto-initializes as MBR on first "create partition".
-        // Note: "active" is not supported on removable media (USB drives).
         var lines = new List<string>
         {
             $"select disk {diskNumber}",
