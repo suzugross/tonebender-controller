@@ -15,16 +15,72 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
         <!-- Header -->
-        <TextBlock Grid.Row="0" Text="WinPE Build"
+        <TextBlock Grid.Row="0" Text="WinPE USB Builder"
                    Style="{StaticResource SectionHeaderStyle}"
                    Foreground="{StaticResource BrWinPeHeader}" />
 
-        <!-- Profile selection + detail -->
+        <!-- Target Drive + Partition Layout -->
         <StackPanel Grid.Row="1" Margin="0,0,0,8">
+            <TextBlock Text="Target Drive" Style="{StaticResource FormLabelStyle}"
+                       FontWeight="Bold" Margin="0,0,0,6" />
+            <Grid Margin="0,0,0,8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <ComboBox Grid.Column="0"
+                          ItemsSource="{Binding UsbDrives}"
+                          SelectedItem="{Binding SelectedDrive}"
+                          Style="{StaticResource FormComboBoxStyle}" />
+                <Button Grid.Column="1"
+                        Command="{Binding RefreshDrivesCommand}"
+                        Background="{StaticResource BrWinPeBtn}"
+                        Style="{StaticResource RoundedButtonStyle}"
+                        Padding="16,4" Margin="8,0,0,0">
+                    <TextBlock Text="Refresh" FontFamily="Segoe UI" FontSize="12"
+                               Foreground="White" />
+                </Button>
+            </Grid>
+
+            <Border Background="White" BorderBrush="{StaticResource BrBorder}"
+                    BorderThickness="1" Padding="12,10">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="120" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="30" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="34" />
+                        <RowDefinition Height="34" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="WINPE (FAT32)"
+                               Style="{StaticResource FormLabelStyle}" />
+                    <TextBox Grid.Row="0" Grid.Column="1"
+                             Text="{Binding WinPeSizeMB}"
+                             Style="{StaticResource FormTextBoxStyle}" VerticalAlignment="Center" />
+                    <TextBlock Grid.Row="0" Grid.Column="2" Text="MB"
+                               Style="{StaticResource FormLabelStyle}" Margin="6,0,0,0" />
+
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="DATA (NTFS)"
+                               Style="{StaticResource FormLabelStyle}" />
+                    <TextBlock Grid.Row="1" Grid.Column="1"
+                               Text="Remaining space"
+                               Foreground="{StaticResource BrTextGray}"
+                               FontFamily="Segoe UI" FontSize="13" FontStyle="Italic"
+                               VerticalAlignment="Center" />
+                </Grid>
+            </Border>
+        </StackPanel>
+
+        <!-- Build Profile -->
+        <StackPanel Grid.Row="2" Margin="0,0,0,8">
             <TextBlock Text="Build Profile" Style="{StaticResource FormLabelStyle}"
                        FontWeight="Bold" Margin="0,0,0,6" />
             <ComboBox ItemsSource="{Binding AvailableProfiles}"
@@ -37,7 +93,7 @@
         </StackPanel>
 
         <!-- OEM Drivers -->
-        <StackPanel Grid.Row="2" Margin="0,0,0,8">
+        <StackPanel Grid.Row="3" Margin="0,0,0,8">
             <TextBlock Text="OEM Drivers" Style="{StaticResource FormLabelStyle}"
                        FontWeight="Bold" Margin="0,0,0,6" />
             <DockPanel>
@@ -72,9 +128,9 @@
         </StackPanel>
 
         <!-- Build Status -->
-        <TextBlock Grid.Row="3" Text="Build Status" Style="{StaticResource FormLabelStyle}"
+        <TextBlock Grid.Row="4" Text="Build Status" Style="{StaticResource FormLabelStyle}"
                    FontWeight="Bold" Margin="0,0,0,6" />
-        <Border Grid.Row="4" Background="White" BorderBrush="{StaticResource BrBorder}"
+        <Border Grid.Row="5" Background="White" BorderBrush="{StaticResource BrBorder}"
                 BorderThickness="1" Padding="12,8" Margin="0,0,0,8">
             <StackPanel>
                 <ProgressBar Value="{Binding BuildProgress}"
@@ -91,7 +147,7 @@
         </Border>
 
         <!-- Build Log -->
-        <Border Grid.Row="5" Background="White"
+        <Border Grid.Row="6" Background="White"
                 BorderBrush="{StaticResource BrBorder}"
                 BorderThickness="1">
             <ScrollViewer x:Name="LogScroller"

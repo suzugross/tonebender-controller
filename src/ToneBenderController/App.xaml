@@ -77,9 +77,6 @@
         <SolidColorBrush x:Key="BrExecBtn" Color="{StaticResource ClrExecBtn}" />
 
         <!-- ═══ ViewModel → View DataTemplate ═══ -->
-        <DataTemplate DataType="{x:Type vm:UsbCreationViewModel}">
-            <views:UsbCreationView />
-        </DataTemplate>
         <DataTemplate DataType="{x:Type vm:WinPeBuildViewModel}">
             <views:WinPeBuildView />
         </DataTemplate>

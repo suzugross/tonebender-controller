@@ -13,7 +13,6 @@ namespace ToneBenderController.ViewModels;
 /// </summary>
 public partial class MainViewModel : ObservableObject
 {
-    private readonly UsbCreationViewModel _usbVm;
     private readonly WinPeBuildViewModel _winPeVm;
     private readonly ToneBenderConfigViewModel _configVm;
     private readonly ImagePrepViewModel _imagePrepVm;
@@ -30,21 +29,19 @@ public partial class MainViewModel : ObservableObject
     private string _executeButtonText = "Execute";
 
     public MainViewModel(
-        UsbCreationViewModel usbVm,
         WinPeBuildViewModel winPeVm,
         ToneBenderConfigViewModel configVm,
         ImagePrepViewModel imagePrepVm,
         IDiskService diskService,
         IPowerShellService psService)
     {
-        _usbVm = usbVm;
         _winPeVm = winPeVm;
         _configVm = configVm;
         _imagePrepVm = imagePrepVm;
         _diskService = diskService;
         _psService = psService;
 
-        _currentPage = _usbVm;
+        _currentPage = _winPeVm;
 
         _winPeVm.PropertyChanged += OnChildVmPropertyChanged;
         _imagePrepVm.PropertyChanged += OnChildVmPropertyChanged;
@@ -71,7 +68,7 @@ public partial class MainViewModel : ObservableObject
         ExecuteButtonText = CurrentPage switch
         {
             WinPeBuildViewModel { IsBuilding: true } => "Cancel",
-            WinPeBuildViewModel { IsBuilding: false } => "Build WinPE",
+            WinPeBuildViewModel { IsBuilding: false } => "Execute",
             ToneBenderConfigViewModel => "Save Config",
             ImagePrepViewModel { IsExporting: true } => "Cancel",
             ImagePrepViewModel { IsExporting: false } => "Export WIM",
@@ -84,7 +81,6 @@ public partial class MainViewModel : ObservableObject
     {
         CurrentPage = page switch
         {
-            "UsbCreation"      => _usbVm,
             "WinPeBuild"       => _winPeVm,
             "ToneBenderConfig" => _configVm,
             "ImagePrep"        => _imagePrepVm,
@@ -97,11 +93,8 @@ public partial class MainViewModel : ObservableObject
     {
         switch (CurrentPage)
         {
-            case UsbCreationViewModel usbVm:
-                await ExecuteUsbCreationAsync(usbVm);
-                break;
             case WinPeBuildViewModel winPeVm:
-                await ExecuteWinPeBuildAsync(winPeVm);
+                await ExecutePipelineAsync(winPeVm);
                 break;
             case ToneBenderConfigViewModel configVm:
                 await ExecuteConfigSaveAsync(configVm);
@@ -110,26 +103,6 @@ public partial class MainViewModel : ObservableObject
                 await ExecuteImagePrepAsync(imagePrepVm);
                 break;
         }
-    }
-
-    private async Task ExecuteWinPeBuildAsync(WinPeBuildViewModel winPeVm)
-    {
-        if (winPeVm.IsBuilding)
-        {
-            winPeVm.CancelBuild();
-            StatusText = "Cancelling WinPE build...";
-            return;
-        }
-
-        if (winPeVm.SelectedProfile is null)
-        {
-            StatusText = "No profile selected.";
-            return;
-        }
-
-        StatusText = "Starting WinPE build...";
-        await winPeVm.RunBuildAsync();
-        StatusText = winPeVm.BuildStatus;
     }
 
     private async Task ExecuteConfigSaveAsync(ToneBenderConfigViewModel configVm)
@@ -144,6 +117,11 @@ public partial class MainViewModel : ObservableObject
         {
             await configVm.SaveConfigAsync();
             StatusText = $"Config saved: {configVm.ConfigFilePath}";
+            MessageBox.Show(
+                $"Config saved successfully.\n\n{configVm.ConfigFilePath}",
+                "Save Complete",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
         }
         catch (Exception ex)
         {
@@ -180,6 +158,13 @@ public partial class MainViewModel : ObservableObject
         StatusText = "Exporting WIM...";
         bool ok = await imagePrepVm.ExportAsync();
         StatusText = imagePrepVm.StatusText;
+
+        if (ok)
+            MessageBox.Show(
+                $"WIM export completed successfully.\n\n{imagePrepVm.StatusText}",
+                "Export Complete",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
     }
 
     public async Task CleanupAsync()
@@ -188,32 +173,45 @@ public partial class MainViewModel : ObservableObject
             await _imagePrepVm.UnmountAsync();
     }
 
-    private async Task ExecuteUsbCreationAsync(UsbCreationViewModel usbVm)
+    private async Task ExecutePipelineAsync(WinPeBuildViewModel vm)
     {
+        if (vm.IsBuilding)
+        {
+            vm.CancelBuild();
+            StatusText = "Cancelling build...";
+            return;
+        }
+
         // ── Validation ──
-        if (usbVm.SelectedDrive == null)
+        if (vm.SelectedDrive == null)
         {
             StatusText = "No USB drive selected.";
             return;
         }
 
+        if (vm.SelectedProfile is null)
+        {
+            StatusText = "No build profile selected.";
+            return;
+        }
+
         var currentDrives = await _diskService.GetUsbDrivesAsync();
-        if (!currentDrives.Any(d => d.DiskNumber == usbVm.SelectedDrive.DiskNumber))
+        if (!currentDrives.Any(d => d.DiskNumber == vm.SelectedDrive.DiskNumber))
         {
             StatusText = "Selected drive is no longer connected. Please refresh.";
             return;
         }
 
-        long requiredBytes = ((long)usbVm.WinPeSizeMB + 1024) * 1024 * 1024;
-        if (usbVm.SelectedDrive.SizeBytes < requiredBytes)
+        long requiredBytes = ((long)vm.WinPeSizeMB + 1024) * 1024 * 1024;
+        if (vm.SelectedDrive.SizeBytes < requiredBytes)
         {
             StatusText = $"Drive too small. Need at least {requiredBytes / (1024 * 1024 * 1024)} GB.";
             return;
         }
 
         // Resolve build profile and workspace media path
-        string profileName = _winPeVm.SelectedProfile ?? "default";
-        var profile = _winPeVm.CurrentProfile;
+        string profileName = vm.SelectedProfile;
+        var profile = vm.CurrentProfile;
         if (profile == null)
         {
             StatusText = "No WinPE build profile loaded. Check Profiles directory.";
@@ -225,17 +223,17 @@ public partial class MainViewModel : ObservableObject
             : Path.Combine(_psService.ScriptDir, profile.WorkDir);
         string mediaDir = Path.Combine(workDir, "media");
 
-        // ── Confirmation dialog — full pipeline ──
+        // ── Confirmation dialog ──
         var result = MessageBox.Show(
-            $"WARNING: All data on Disk {usbVm.SelectedDrive.DiskNumber} " +
-            $"({usbVm.SelectedDrive.FriendlyName}, {usbVm.SelectedDrive.DisplaySize}) " +
+            $"WARNING: All data on Disk {vm.SelectedDrive.DiskNumber} " +
+            $"({vm.SelectedDrive.FriendlyName}, {vm.SelectedDrive.DisplaySize}) " +
             $"will be permanently erased.\n\n" +
             $"Pipeline:\n" +
             $"  1. Partition USB drive\n" +
             $"  2. Build WinPE (profile: {profileName})\n" +
             $"  3. Deploy WinPE to USB\n\n" +
             $"Partition layout:\n" +
-            $"  WINPE (FAT32): {usbVm.WinPeSizeMB} MB\n" +
+            $"  WINPE (FAT32): {vm.WinPeSizeMB} MB\n" +
             $"  DATA (NTFS): Remaining space\n\n" +
             $"Continue?",
             "Confirm USB Pipeline",
@@ -246,7 +244,7 @@ public partial class MainViewModel : ObservableObject
 
         var config = new UsbPartitionConfig
         {
-            WinPeSizeMB = usbVm.WinPeSizeMB,
+            WinPeSizeMB = vm.WinPeSizeMB,
             DataUsesRemainingSpace = true
         };
 
@@ -257,7 +255,7 @@ public partial class MainViewModel : ObservableObject
             // ── Phase 1: Partition USB ──
             StatusText = "[1/3] Partitioning USB drive...";
             var partResult = await _diskService.PartitionDriveAsync(
-                usbVm.SelectedDrive.DiskNumber, config, progress);
+                vm.SelectedDrive.DiskNumber, config, progress);
 
             if (!partResult.Success)
             {
@@ -272,13 +270,13 @@ public partial class MainViewModel : ObservableObject
 
             // ── Phase 2: Build WinPE ──
             StatusText = "[2/3] Building WinPE...";
-            bool buildOk = await _winPeVm.RunBuildAsync();
+            bool buildOk = await vm.RunBuildAsync();
 
             if (!buildOk)
             {
                 StatusText = "[2/3] WinPE build failed.";
                 MessageBox.Show(
-                    _winPeVm.BuildStatus,
+                    vm.BuildStatus,
                     "WinPE Build Error",
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
@@ -302,8 +300,13 @@ public partial class MainViewModel : ObservableObject
                 mediaDir, partResult.WinPeLetter, progress);
 
             // ── Pipeline complete ──
-            StatusText = $"Pipeline complete! WINPE={partResult.WinPeLetter}:, " +
-                         $"DATA={partResult.DataLetter}:";
+            string completeMsg = $"WINPE={partResult.WinPeLetter}:, DATA={partResult.DataLetter}:";
+            StatusText = $"Pipeline complete! {completeMsg}";
+            MessageBox.Show(
+                $"USB pipeline completed successfully.\n\n{completeMsg}",
+                "Pipeline Complete",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
         }
         catch (Exception ex)
         {

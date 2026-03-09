@@ -67,7 +67,7 @@ public partial class ImagePrepViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void BrowseIso()
+    private async Task BrowseIsoAsync()
     {
         var dialog = new OpenFileDialog
         {
@@ -76,7 +76,10 @@ public partial class ImagePrepViewModel : ObservableObject
         };
 
         if (dialog.ShowDialog() == true)
+        {
             IsoFilePath = dialog.FileName;
+            await LoadEditionsAsync();
+        }
     }
 
     [RelayCommand]

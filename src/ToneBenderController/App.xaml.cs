@@ -36,7 +36,6 @@ public partial class App : Application
         services.AddSingleton<IWindowsImageService, WindowsImageService>();
 
         // --- ViewModels (Singleton) ---
-        services.AddSingleton<UsbCreationViewModel>();
         services.AddSingleton<WinPeBuildViewModel>();
         services.AddSingleton<ToneBenderConfigViewModel>();
         services.AddSingleton<ImagePrepViewModel>();

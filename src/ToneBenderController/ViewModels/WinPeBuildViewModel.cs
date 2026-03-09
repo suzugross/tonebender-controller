@@ -9,15 +9,26 @@ using ToneBenderController.Services;
 namespace ToneBenderController.ViewModels;
 
 /// <summary>
-/// WinPE build profile management and build execution.
+/// USB drive selection, WinPE build, and deploy — unified pipeline.
 /// </summary>
 public partial class WinPeBuildViewModel : ObservableObject
 {
     private readonly IProfileService _profileService;
     private readonly IPowerShellService _psService;
+    private readonly IDiskService _diskService;
     private readonly string _profilesDir;
     private CancellationTokenSource? _buildCts;
 
+    // ── USB Drive ──
+    public ObservableCollection<UsbDriveInfo> UsbDrives { get; } = [];
+
+    [ObservableProperty]
+    private UsbDriveInfo? _selectedDrive;
+
+    [ObservableProperty]
+    private int _winPeSizeMB = 4096;
+
+    // ── Build Profile ──
     public ObservableCollection<string> AvailableProfiles { get; } = [];
     public ObservableCollection<BuildLogEntry> BuildLog { get; } = [];
 
@@ -42,10 +53,14 @@ public partial class WinPeBuildViewModel : ObservableObject
     [ObservableProperty]
     private string _driverDirectory = "";
 
-    public WinPeBuildViewModel(IProfileService profileService, IPowerShellService psService)
+    public WinPeBuildViewModel(
+        IProfileService profileService,
+        IPowerShellService psService,
+        IDiskService diskService)
     {
         _profileService = profileService;
         _psService = psService;
+        _diskService = diskService;
         _profilesDir = Path.Combine(_psService.ScriptDir, "Profiles");
 
         try
@@ -59,7 +74,22 @@ public partial class WinPeBuildViewModel : ObservableObject
         {
             BuildStatus = ex.Message;
         }
+
+        _ = RefreshDrivesAsync();
     }
+
+    // ── USB Drive commands ──
+
+    [RelayCommand]
+    private async Task RefreshDrivesAsync()
+    {
+        UsbDrives.Clear();
+        var drives = await _diskService.GetUsbDrivesAsync();
+        foreach (var drive in drives)
+            UsbDrives.Add(drive);
+    }
+
+    // ── Profile ──
 
     partial void OnSelectedProfileChanged(string? value)
     {
@@ -84,6 +114,8 @@ public partial class WinPeBuildViewModel : ObservableObject
         ProfileDetail = $"{value.Architecture} | {value.Packages.Count} packages | {value.Output.IsoPath}";
     }
 
+    // ── OEM Drivers ──
+
     [RelayCommand]
     private void BrowseDriverDirectory()
     {
@@ -100,6 +132,8 @@ public partial class WinPeBuildViewModel : ObservableObject
     {
         DriverDirectory = "";
     }
+
+    // ── Build ──
 
     public async Task<bool> RunBuildAsync()
     {

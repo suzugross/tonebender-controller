@@ -22,14 +22,21 @@
 
         <!-- ═══ Banner (matches ToneBender dark navy banner) ═══ -->
         <Border Grid.Row="0" Background="{StaticResource BrBanner}">
-            <StackPanel Margin="16,0,0,0" VerticalAlignment="Center">
-                <TextBlock Text="ToneBender Controller"
-                           FontFamily="Segoe UI" FontSize="20" FontWeight="Bold"
-                           Foreground="White" />
-                <TextBlock Text="WinPE Builder &amp; USB Deploy Tool"
-                           FontFamily="Segoe UI" FontSize="11"
-                           Foreground="{StaticResource BrBannerText}" />
-            </StackPanel>
+            <Grid>
+                <StackPanel Margin="16,0,0,0" VerticalAlignment="Center">
+                    <TextBlock Text="ToneBender Controller"
+                               FontFamily="Segoe UI" FontSize="20" FontWeight="Bold"
+                               Foreground="White" />
+                    <TextBlock Text="WinPE Builder &amp; USB Deploy Tool"
+                               FontFamily="Segoe UI" FontSize="11"
+                               Foreground="{StaticResource BrBannerText}" />
+                </StackPanel>
+                <TextBlock Text="yuki.suzuki@suzugross.com"
+                           FontFamily="Segoe UI" FontSize="9"
+                           Foreground="#40FFFFFF"
+                           HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                           Margin="0,0,10,4" />
+            </Grid>
         </Border>
 
         <!-- ═══ Tab bar ═══ -->
@@ -75,21 +82,12 @@
                 <!-- Main flow tabs (left-aligned) -->
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Bottom">
                     <Button Command="{Binding NavigateCommand}"
-                            CommandParameter="UsbCreation"
-                            Style="{StaticResource TabButtonStyle}">
-                        <StackPanel Orientation="Horizontal">
-                            <Rectangle Width="4" Height="14" Fill="{StaticResource BrUsbAccent}"
-                                       Margin="0,0,8,0" RadiusX="1" RadiusY="1" />
-                            <TextBlock Text="USB Creation" />
-                        </StackPanel>
-                    </Button>
-                    <Button Command="{Binding NavigateCommand}"
                             CommandParameter="WinPeBuild"
                             Style="{StaticResource TabButtonStyle}">
                         <StackPanel Orientation="Horizontal">
                             <Rectangle Width="4" Height="14" Fill="{StaticResource BrWinPeAccent}"
                                        Margin="0,0,8,0" RadiusX="1" RadiusY="1" />
-                            <TextBlock Text="WinPE Build" />
+                            <TextBlock Text="WinPE USB Builder" />
                         </StackPanel>
                     </Button>
                 </StackPanel>

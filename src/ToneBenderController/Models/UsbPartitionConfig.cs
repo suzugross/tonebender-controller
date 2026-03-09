@@ -7,7 +7,7 @@ namespace ToneBenderController.Models;
 public class UsbPartitionConfig
 {
     /// <summary>WINPE partition size in MB (FAT32, WinPE boot).</summary>
-    public int WinPeSizeMB { get; set; } = 2048;
+    public int WinPeSizeMB { get; set; } = 4096;
 
     /// <summary>DATA partition uses remaining space (NTFS, image/data storage).</summary>
     public bool DataUsesRemainingSpace { get; set; } = true;
