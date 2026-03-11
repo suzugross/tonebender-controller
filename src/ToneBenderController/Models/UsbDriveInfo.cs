@@ -8,6 +8,7 @@ public class UsbDriveInfo
     public int DiskNumber { get; set; }
     public string FriendlyName { get; set; } = "";
     public long SizeBytes { get; set; }
+    public bool IsFixedDisk { get; set; }
 
     public string DisplaySize => SizeBytes switch
     {

@@ -11,7 +11,7 @@ public interface IDiskService
     Task<List<UsbDriveInfo>> GetUsbDrivesAsync();
 
     /// <summary>Partition a USB drive with WINPE/DATA layout.</summary>
-    Task<UsbPartitionResult> PartitionDriveAsync(int diskNumber, UsbPartitionConfig config, IProgress<string>? progress = null);
+    Task<UsbPartitionResult> PartitionDriveAsync(int diskNumber, UsbPartitionConfig config, bool isFixedDisk = false, IProgress<string>? progress = null);
 
     /// <summary>Detect whether the system uses UEFI (true) or BIOS (false) firmware.</summary>
     Task<bool> IsUefiFirmwareAsync();

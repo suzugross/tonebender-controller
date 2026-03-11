@@ -50,6 +50,12 @@ public partial class ImagePrepViewModel : ObservableObject
     [ObservableProperty]
     private string _driverDirectory = "";
 
+    [ObservableProperty]
+    private bool _injectUnattend;
+
+    [ObservableProperty]
+    private bool _injectRegistry;
+
     public ImagePrepViewModel(IWindowsImageService imageService)
     {
         _imageService = imageService;
@@ -224,6 +230,19 @@ public partial class ImagePrepViewModel : ObservableObject
                     destPath, DriverDirectory, driverProgress, _exportCts.Token);
             }
 
+            // Customize WIM (unattend + registry) in a single mount
+            if (InjectUnattend || InjectRegistry)
+            {
+                StatusText = "Customizing WIM...";
+                var customizeProgress = new Progress<string>(msg => StatusText = msg);
+                await _imageService.CustomizeWimAsync(
+                    destPath,
+                    InjectUnattend ? GenerateUnattendXml() : null,
+                    InjectRegistry,
+                    customizeProgress,
+                    _exportCts.Token);
+            }
+
             StatusText = $"Export complete: {subDirName}\\{OutputFileName}";
             return true;
         }
@@ -291,5 +310,56 @@ public partial class ImagePrepViewModel : ObservableObject
     private static string SanitizeFileName(string name)
     {
         return Regex.Replace(name, @"[^\w\-.()]", "_");
+    }
+
+    private static string GenerateUnattendXml()
+    {
+        return """
+            <?xml version="1.0" encoding="utf-8"?>
+            <unattend xmlns="urn:schemas-microsoft-com:unattend">
+                <settings pass="generalize">
+                    <component name="Microsoft-Windows-PnpSysprep" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                        <DoNotCleanUpNonPresentDevices>true</DoNotCleanUpNonPresentDevices>
+                        <PersistAllDeviceInstalls>true</PersistAllDeviceInstalls>
+                    </component>
+                </settings>
+                <settings pass="specialize">
+                    <component name="Microsoft-Windows-Shell-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                        <ComputerName>*</ComputerName>
+                        <CopyProfile>true</CopyProfile>
+                        <TimeZone>Tokyo Standard Time</TimeZone>
+                    </component>
+                </settings>
+                <settings pass="oobeSystem">
+                    <component name="Microsoft-Windows-International-Core" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                        <InputLocale>ja-JP</InputLocale>
+                        <SystemLocale>ja-JP</SystemLocale>
+                        <UILanguage>ja-JP</UILanguage>
+                        <UILanguageFallback>ja-JP</UILanguageFallback>
+                        <UserLocale>ja-JP</UserLocale>
+                    </component>
+                    <component name="Microsoft-Windows-Shell-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                        <OOBE>
+                            <HideEULAPage>true</HideEULAPage>
+                            <ProtectYourPC>3</ProtectYourPC>
+                            <HideWirelessSetupInOOBE>true</HideWirelessSetupInOOBE>
+                            <HideOnlineAccountScreens>true</HideOnlineAccountScreens>
+                            <HideOEMRegistrationScreen>true</HideOEMRegistrationScreen>
+                        </OOBE>
+                        <UserAccounts>
+                            <LocalAccounts>
+                                <LocalAccount wcm:action="add">
+                                    <Name>test</Name>
+                                    <Group>Administrators</Group>
+                                </LocalAccount>
+                            </LocalAccounts>
+                        </UserAccounts>
+                    </component>
+                    <component name="Microsoft-Windows-SecureStartup-FilterDriver" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                        <PreventDeviceEncryption>true</PreventDeviceEncryption>
+                    </component>
+                </settings>
+            </unattend>
+            """;
     }
 }

@@ -11,6 +11,7 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <!-- Header -->
@@ -140,8 +141,33 @@
             </TextBlock>
         </StackPanel>
 
+        <!-- WIM Customization options -->
+        <StackPanel Grid.Row="5" Margin="0,0,0,12">
+            <TextBlock Text="WIM Customization" Style="{StaticResource FormLabelStyle}"
+                       FontWeight="Bold" Margin="0,0,0,6" />
+            <CheckBox IsChecked="{Binding InjectUnattend}"
+                      FontFamily="Segoe UI" FontSize="12"
+                      VerticalContentAlignment="Center"
+                      Margin="0,0,0,4">
+                <TextBlock Text="Inject unattend.xml (OOBE skip, create user: test)"
+                           FontFamily="Segoe UI" FontSize="12" />
+            </CheckBox>
+            <CheckBox IsChecked="{Binding InjectRegistry}"
+                      FontFamily="Segoe UI" FontSize="12"
+                      VerticalContentAlignment="Center"
+                      Margin="0,0,0,4">
+                <TextBlock Text="Inject registry (disable store auto-update, consumer features)"
+                           FontFamily="Segoe UI" FontSize="12" />
+            </CheckBox>
+            <TextBlock FontFamily="Segoe UI" FontSize="11"
+                       Foreground="{StaticResource BrTextGray}"
+                       Margin="20,2,0,0"
+                       TextWrapping="Wrap"
+                       Text="Unattend: OOBE skip + user creation. Registry: DisableWindowsConsumerFeatures, Store AutoDownload off, DisableOSUpgrade." />
+        </StackPanel>
+
         <!-- Progress -->
-        <Border Grid.Row="5" Background="White" BorderBrush="{StaticResource BrBorder}"
+        <Border Grid.Row="6" Background="White" BorderBrush="{StaticResource BrBorder}"
                 BorderThickness="1" Padding="12,8">
             <StackPanel>
                 <ProgressBar Value="{Binding ExportProgress}"

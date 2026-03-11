@@ -17,7 +17,7 @@ public class DiskService : IDiskService
             var results = new List<UsbDriveInfo>();
 
             using var searcher = new ManagementObjectSearcher(
-                "SELECT Index, Model, Size, InterfaceType, PNPDeviceID FROM Win32_DiskDrive");
+                "SELECT Index, Model, Size, InterfaceType, PNPDeviceID, MediaType FROM Win32_DiskDrive");
 
             foreach (ManagementObject disk in searcher.Get())
             {
@@ -28,12 +28,16 @@ public class DiskService : IDiskService
 
                 string interfaceType = (disk["InterfaceType"]?.ToString() ?? "").ToLowerInvariant();
                 string pnpDeviceId = (disk["PNPDeviceID"]?.ToString() ?? "").ToLowerInvariant();
+                string mediaType = (disk["MediaType"]?.ToString() ?? "").ToLowerInvariant();
 
-                // USB detection (matches ToneBender C++ DiskManager logic)
+                // USB detection: bus type, PnP device ID, or external media type
+                // USB flash drives: InterfaceType=USB or PNPDeviceID contains USBSTOR
+                // USB portable SSDs: InterfaceType=SCSI (USB-NVMe bridge) but MediaType=External
                 bool isBusUsb = interfaceType == "usb" || interfaceType == "sd";
                 bool isPnpUsb = pnpDeviceId.Contains("usbstor") || pnpDeviceId.Contains("usb\\");
+                bool isExternal = mediaType.Contains("external");
 
-                if (!isBusUsb && !isPnpUsb) continue;
+                if (!isBusUsb && !isPnpUsb && !isExternal) continue;
 
                 long sizeBytes = 0;
                 if (disk["Size"] != null)
@@ -45,7 +49,8 @@ public class DiskService : IDiskService
                 {
                     DiskNumber = diskNumber,
                     FriendlyName = disk["Model"]?.ToString() ?? "Unknown USB Drive",
-                    SizeBytes = sizeBytes
+                    SizeBytes = sizeBytes,
+                    IsFixedDisk = mediaType.Contains("fixed") || mediaType.Contains("external")
                 });
             }
 
@@ -81,7 +86,7 @@ public class DiskService : IDiskService
     }
 
     public async Task<UsbPartitionResult> PartitionDriveAsync(
-        int diskNumber, UsbPartitionConfig config, IProgress<string>? progress = null)
+        int diskNumber, UsbPartitionConfig config, bool isFixedDisk = false, IProgress<string>? progress = null)
     {
         // Safety: refuse disk 0
         if (diskNumber == 0)
@@ -101,31 +106,55 @@ public class DiskService : IDiskService
         {
             progress?.Report("Partitioning USB drive...");
 
-            // Single diskpart script: clean → create partitions → format → assign
-            // USB drives always use MBR (auto-initialized by first "create partition").
-            // No "convert gpt/mbr" needed — diskpart auto-initializes as MBR.
-            // No "offline/online disk" — not supported on removable media.
-            string script = BuildPartitionScript(diskNumber, config,
-                winPeLetter, dataLetter);
-
-            var (exitCode, output) = await RunDiskpartScriptAsync(script);
-            if (exitCode != 0 || HasDiskpartError(output))
+            if (isFixedDisk)
             {
-                return new UsbPartitionResult
+                // Fixed disks (portable SSDs): diskpart format often fails due to
+                // sector size issues. Use diskpart only for partitioning + letter assignment,
+                // then format via PowerShell Format-Volume which handles 4Kn/512e properly.
+                string script = BuildPartitionScriptNoFormat(diskNumber, config,
+                    winPeLetter, dataLetter);
+
+                var (exitCode, output) = await RunDiskpartScriptAsync(script);
+                if (exitCode != 0 || HasDiskpartError(output))
                 {
-                    Success = false,
-                    ErrorMessage = $"Partitioning failed:\n{output}"
-                };
-            }
+                    return new UsbPartitionResult
+                    {
+                        Success = false,
+                        ErrorMessage = $"Partitioning failed:\n{output}"
+                    };
+                }
 
-            // Best-effort: set WINPE partition as active for Legacy BIOS/CSM boot.
-            // "active" is unsupported on some removable USB media — failure is harmless.
-            try
-            {
-                await RunDiskpartScriptAsync(
-                    $"select disk {diskNumber}\r\nselect partition 1\r\nactive\r\nexit\r\n");
+                // Format via PowerShell (handles 4Kn SSDs correctly)
+                progress?.Report("Formatting WINPE (FAT32)...");
+                await FormatVolumeAsync(winPeLetter, "FAT32", "WINPE");
+
+                progress?.Report("Formatting DATA (NTFS)...");
+                await FormatVolumeAsync(dataLetter, "NTFS", "DATA");
             }
-            catch { /* swallow — UEFI doesn't need active flag */ }
+            else
+            {
+                // Removable disks (USB flash): diskpart format works fine.
+                string script = BuildPartitionScript(diskNumber, config,
+                    winPeLetter, dataLetter);
+
+                var (exitCode, output) = await RunDiskpartScriptAsync(script);
+                if (exitCode != 0 || HasDiskpartError(output))
+                {
+                    return new UsbPartitionResult
+                    {
+                        Success = false,
+                        ErrorMessage = $"Partitioning failed:\n{output}"
+                    };
+                }
+
+                // Best-effort: set WINPE partition as active for Legacy BIOS/CSM boot.
+                try
+                {
+                    await RunDiskpartScriptAsync(
+                        $"select disk {diskNumber}\r\nselect partition 1\r\nactive\r\nexit\r\n");
+                }
+                catch { /* swallow — UEFI doesn't need active flag */ }
+            }
         }
         finally
         {
@@ -205,24 +234,82 @@ public class DiskService : IDiskService
         int diskNumber, UsbPartitionConfig config,
         char winPeLetter, char dataLetter)
     {
-        // Single script: clean → create partitions → format → assign.
-        // After "clean", diskpart auto-initializes as MBR on first "create partition".
+        // Removable media (USB flash): MBR, auto-initialized by "create partition".
+        // diskpart format works reliably on removable media.
         var lines = new List<string>
         {
             $"select disk {diskNumber}",
             "attributes disk clear readonly noerr",
             "clean",
             $"create partition primary size={config.WinPeSizeMB}",
-            "format quick fs=fat32 label=\"WINPE\"",
+            "format quick fs=fat32 label=WINPE",
             $"assign letter={winPeLetter}",
             "create partition primary",
-            "format quick fs=ntfs label=\"DATA\"",
+            "format quick fs=ntfs label=DATA",
             $"assign letter={dataLetter}",
             "exit",
             ""
         };
 
         return string.Join("\r\n", lines);
+    }
+
+    private static string BuildPartitionScriptNoFormat(
+        int diskNumber, UsbPartitionConfig config,
+        char winPeLetter, char dataLetter)
+    {
+        // Fixed media (portable SSD): GPT + create/assign only (no format).
+        // Format is handled separately via PowerShell Format-Volume.
+        var lines = new List<string>
+        {
+            $"select disk {diskNumber}",
+            "attributes disk clear readonly noerr",
+            "clean",
+            "convert gpt",
+            $"create partition primary size={config.WinPeSizeMB}",
+            $"assign letter={winPeLetter}",
+            "create partition primary",
+            $"assign letter={dataLetter}",
+            "exit",
+            ""
+        };
+
+        return string.Join("\r\n", lines);
+    }
+
+    private static async Task FormatVolumeAsync(char driveLetter, string fileSystem, string label)
+    {
+        string psCommand = $"Format-Volume -DriveLetter {driveLetter} -FileSystem {fileSystem} -NewFileSystemLabel '{label}' -Force -Confirm:$false";
+
+        var psi = new ProcessStartInfo
+        {
+            FileName = "powershell.exe",
+            Arguments = $"-NoProfile -Command \"{psCommand}\"",
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true
+        };
+
+        using var process = Process.Start(psi)
+            ?? throw new InvalidOperationException("Failed to start powershell.exe.");
+
+        var stdoutTask = process.StandardOutput.ReadToEndAsync();
+        var stderrTask = process.StandardError.ReadToEndAsync();
+        var exitTask = process.WaitForExitAsync();
+
+        if (await Task.WhenAny(exitTask, Task.Delay(120_000)) != exitTask)
+        {
+            process.Kill(entireProcessTree: true);
+            throw new InvalidOperationException($"Format-Volume {driveLetter}: timed out.");
+        }
+
+        string stdout = await stdoutTask;
+        string stderr = await stderrTask;
+
+        if (process.ExitCode != 0)
+            throw new InvalidOperationException(
+                $"Format-Volume {driveLetter}: failed (exit code {process.ExitCode}):\n{stdout}\n{stderr}");
     }
 
     private static char FindAvailableLetter(char[] candidates, HashSet<char> usedLetters)

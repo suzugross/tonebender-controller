@@ -255,7 +255,7 @@ public partial class MainViewModel : ObservableObject
             // ── Phase 1: Partition USB ──
             StatusText = "[1/3] Partitioning USB drive...";
             var partResult = await _diskService.PartitionDriveAsync(
-                vm.SelectedDrive.DiskNumber, config, progress);
+                vm.SelectedDrive.DiskNumber, config, vm.SelectedDrive.IsFixedDisk, progress);
 
             if (!partResult.Success)
             {
