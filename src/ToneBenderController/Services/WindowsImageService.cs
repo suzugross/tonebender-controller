@@ -223,8 +223,8 @@ public class WindowsImageService : IWindowsImageService
     private const string OfflineHiveKey = "HKLM\\OFFLINE_SOFTWARE";
 
     public async Task CustomizeWimAsync(
-        string wimPath, string? unattendXml, bool injectRegistry,
-        IProgress<string>? progress = null, CancellationToken ct = default)
+        string wimPath, string? unattendXml, string? setupCompleteCmd,
+        bool injectRegistry, IProgress<string>? progress = null, CancellationToken ct = default)
     {
         if (!File.Exists(wimPath))
             throw new FileNotFoundException("WIM file not found.", wimPath);
@@ -262,6 +262,21 @@ public class WindowsImageService : IWindowsImageService
                     Path.Combine(pantherDir, "unattend.xml"),
                     unattendXml,
                     System.Text.Encoding.UTF8,
+                    ct);
+            }
+
+            // ── SetupComplete.cmd ──
+            if (setupCompleteCmd is not null)
+            {
+                progress?.Report("Injecting SetupComplete.cmd...");
+                ct.ThrowIfCancellationRequested();
+
+                string scriptsDir = Path.Combine(mountDir, "Windows", "Setup", "Scripts");
+                Directory.CreateDirectory(scriptsDir);
+                await File.WriteAllTextAsync(
+                    Path.Combine(scriptsDir, "SetupComplete.cmd"),
+                    setupCompleteCmd,
+                    System.Text.Encoding.Default, // CMD files use system default encoding (Shift-JIS on Japanese Windows)
                     ct);
             }
 

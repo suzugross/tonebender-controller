@@ -149,7 +149,7 @@
                       FontFamily="Segoe UI" FontSize="12"
                       VerticalContentAlignment="Center"
                       Margin="0,0,0,4">
-                <TextBlock Text="Inject unattend.xml (OOBE skip, create user: test)"
+                <TextBlock Text="Inject unattend.xml + SetupComplete.cmd (OOBE skip, Administrator auto-logon)"
                            FontFamily="Segoe UI" FontSize="12" />
             </CheckBox>
             <CheckBox IsChecked="{Binding InjectRegistry}"
@@ -163,7 +163,7 @@
                        Foreground="{StaticResource BrTextGray}"
                        Margin="20,2,0,0"
                        TextWrapping="Wrap"
-                       Text="Unattend: OOBE skip + user creation. Registry: DisableWindowsConsumerFeatures, Store AutoDownload off, DisableOSUpgrade." />
+                       Text="Unattend: OOBE skip, temp user → SetupComplete: Administrator有効化+自動ログオン, testユーザー削除, タスク無効化. Registry: Store自動更新停止, ConsumerFeatures無効." />
         </StackPanel>
 
         <!-- Progress -->

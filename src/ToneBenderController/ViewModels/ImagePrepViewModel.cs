@@ -238,6 +238,7 @@ public partial class ImagePrepViewModel : ObservableObject
                 await _imageService.CustomizeWimAsync(
                     destPath,
                     InjectUnattend ? GenerateUnattendXml() : null,
+                    InjectUnattend ? GenerateSetupCompleteCmd() : null,
                     InjectRegistry,
                     customizeProgress,
                     _exportCts.Token);
@@ -310,6 +311,28 @@ public partial class ImagePrepViewModel : ObservableObject
     private static string SanitizeFileName(string name)
     {
         return Regex.Replace(name, @"[^\w\-.()]", "_");
+    }
+
+    private static string GenerateSetupCompleteCmd()
+    {
+        return """
+            @echo off
+            echo [1/4] Enabling built-in Administrator...
+            net user Administrator /active:yes
+
+            echo [2/4] Setting Administrator auto-logon...
+            reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v AutoAdminLogon /t REG_SZ /d "1" /f
+            reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v DefaultUserName /t REG_SZ /d "Administrator" /f
+            reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v DefaultPassword /t REG_SZ /d "" /f
+
+            echo [3/4] Deleting temporary user 'test'...
+            net user test /delete
+
+            echo [4/4] Disabling scheduled task...
+            schtasks /change /disable /tn "\Microsoft\Windows\AppxDeploymentClient\Pre-staged app cleanup" >nul 2>&1
+
+            echo SetupComplete finished.
+            """;
     }
 
     private static string GenerateUnattendXml()

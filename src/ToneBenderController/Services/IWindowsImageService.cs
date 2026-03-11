@@ -31,6 +31,6 @@ public interface IWindowsImageService
     /// Mount a WIM, inject unattend.xml and/or registry entries, then unmount with commit.
     /// Both operations share a single mount/unmount cycle for performance.
     /// </summary>
-    Task CustomizeWimAsync(string wimPath, string? unattendXml, bool injectRegistry,
-        IProgress<string>? progress = null, CancellationToken ct = default);
+    Task CustomizeWimAsync(string wimPath, string? unattendXml, string? setupCompleteCmd,
+        bool injectRegistry, IProgress<string>? progress = null, CancellationToken ct = default);
 }

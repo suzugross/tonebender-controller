@@ -7,6 +7,7 @@ Inject/
 # .NET build artifacts
 bin/
 obj/
+publish/
 *.user
 *.suo
 *.DotSettings.user
