@@ -317,21 +317,26 @@ public partial class ImagePrepViewModel : ObservableObject
     {
         return """
             @echo off
-            echo [1/4] Enabling built-in Administrator...
+            echo [1/5] Enabling built-in Administrator...
             net user Administrator /active:yes
 
-            echo [2/4] Setting Administrator auto-logon...
+            echo [2/5] Setting Administrator auto-logon...
             reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v AutoAdminLogon /t REG_SZ /d "1" /f
             reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v DefaultUserName /t REG_SZ /d "Administrator" /f
             reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v DefaultPassword /t REG_SZ /d "" /f
 
-            echo [3/4] Deleting temporary user 'test'...
+            echo [3/5] Deleting temporary user 'test'...
             net user test /delete
 
-            echo [4/4] Disabling scheduled task...
+            echo [4/5] Disabling scheduled task...
             schtasks /change /disable /tn "\Microsoft\Windows\AppxDeploymentClient\Pre-staged app cleanup" >nul 2>&1
 
-            echo SetupComplete finished.
+            echo [5/5] Setting Japanese 106/109 keyboard layout...
+            reg add "HKLM\SYSTEM\CurrentControlSet\Services\i8042prt\Parameters" /v "LayerDriver JPN" /t REG_SZ /d "kbd106.dll" /f
+            reg add "HKLM\SYSTEM\CurrentControlSet\Services\i8042prt\Parameters" /v "OverrideKeyboardSubtype" /t REG_DWORD /d 2 /f
+
+            echo SetupComplete finished. Restarting to apply keyboard layout...
+            shutdown /r /t 3
             """;
     }
 
@@ -355,7 +360,7 @@ public partial class ImagePrepViewModel : ObservableObject
                 </settings>
                 <settings pass="oobeSystem">
                     <component name="Microsoft-Windows-International-Core" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-                        <InputLocale>ja-JP</InputLocale>
+                        <InputLocale>0411:00000411</InputLocale>
                         <SystemLocale>ja-JP</SystemLocale>
                         <UILanguage>ja-JP</UILanguage>
                         <UILanguageFallback>ja-JP</UILanguageFallback>

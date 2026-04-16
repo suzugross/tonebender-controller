@@ -370,7 +370,7 @@ public class WindowsImageService : IWindowsImageService
     {
         var (exit, stdout, stderr) = await RunProcessAsync(
             "reg.exe",
-            $"add \"{keyPath}\" /v {valueName} /t {type} /d {data} /f",
+            $"add \"{keyPath}\" /v \"{valueName}\" /t {type} /d \"{data}\" /f",
             timeoutMs: 15_000);
 
         if (exit != 0)
