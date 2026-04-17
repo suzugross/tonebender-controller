@@ -220,11 +220,9 @@ public class WindowsImageService : IWindowsImageService
         }
     }
 
-    private const string OfflineHiveKey = "HKLM\\OFFLINE_SOFTWARE";
-
     public async Task CustomizeWimAsync(
         string wimPath, string? unattendXml, string? setupCompleteCmd,
-        bool injectRegistry, IProgress<string>? progress = null, CancellationToken ct = default)
+        IProgress<string>? progress = null, CancellationToken ct = default)
     {
         if (!File.Exists(wimPath))
             throw new FileNotFoundException("WIM file not found.", wimPath);
@@ -280,57 +278,6 @@ public class WindowsImageService : IWindowsImageService
                     ct);
             }
 
-            // ── Registry injection ──
-            if (injectRegistry)
-            {
-                progress?.Report("Injecting registry entries...");
-                ct.ThrowIfCancellationRequested();
-
-                string hiveFile = Path.Combine(mountDir, "Windows", "System32", "config", "SOFTWARE");
-                if (!File.Exists(hiveFile))
-                    throw new FileNotFoundException("SOFTWARE registry hive not found in WIM.", hiveFile);
-
-                try
-                {
-                    // Load offline hive
-                    var (loadExit, loadOut, loadErr) = await RunProcessAsync(
-                        "reg.exe",
-                        $"load {OfflineHiveKey} \"{hiveFile}\"",
-                        timeoutMs: 30_000);
-
-                    if (loadExit != 0)
-                        throw new InvalidOperationException(
-                            $"reg load failed (exit code {loadExit}):\n{loadOut}\n{loadErr}");
-
-                    // Disable consumer features (auto-install of promoted store apps)
-                    await RegAddAsync(
-                        $"{OfflineHiveKey}\\Policies\\Microsoft\\Windows\\CloudContent",
-                        "DisableWindowsConsumerFeatures", "REG_DWORD", "1");
-
-                    // Disable store app auto-update
-                    await RegAddAsync(
-                        $"{OfflineHiveKey}\\Policies\\Microsoft\\WindowsStore",
-                        "AutoDownload", "REG_DWORD", "2");
-
-                    // Disable store app auto-download (non-policy path)
-                    await RegAddAsync(
-                        $"{OfflineHiveKey}\\Microsoft\\Windows\\CurrentVersion\\WindowsStore\\WindowsUpdate",
-                        "AutoDownload", "REG_DWORD", "5");
-
-                    // Disable OS upgrade via store
-                    await RegAddAsync(
-                        $"{OfflineHiveKey}\\Policies\\Microsoft\\WindowsStore",
-                        "DisableOSUpgrade", "REG_DWORD", "1");
-
-                    progress?.Report("Registry entries injected.");
-                }
-                finally
-                {
-                    // Always unload hive — must succeed before unmount
-                    await RunProcessAsync("reg.exe", $"unload {OfflineHiveKey}", timeoutMs: 30_000);
-                }
-            }
-
             // ── Unmount with commit ──
             progress?.Report("Unmounting WIM (commit)...");
             ct.ThrowIfCancellationRequested();
@@ -364,18 +311,6 @@ public class WindowsImageService : IWindowsImageService
             try { if (Directory.Exists(mountDir)) Directory.Delete(mountDir, true); }
             catch { /* swallow */ }
         }
-    }
-
-    private static async Task RegAddAsync(string keyPath, string valueName, string type, string data)
-    {
-        var (exit, stdout, stderr) = await RunProcessAsync(
-            "reg.exe",
-            $"add \"{keyPath}\" /v \"{valueName}\" /t {type} /d \"{data}\" /f",
-            timeoutMs: 15_000);
-
-        if (exit != 0)
-            throw new InvalidOperationException(
-                $"reg add failed for {valueName} (exit code {exit}):\n{stdout}\n{stderr}");
     }
 
     // ── Private helpers ──────────────────────────────────────────

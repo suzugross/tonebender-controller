@@ -148,22 +148,57 @@
             <CheckBox IsChecked="{Binding InjectUnattend}"
                       FontFamily="Segoe UI" FontSize="12"
                       VerticalContentAlignment="Center"
-                      Margin="0,0,0,4">
-                <TextBlock Text="Inject unattend.xml + SetupComplete.cmd (OOBE skip, Administrator auto-logon)"
+                      Margin="0,0,0,8">
+                <TextBlock Text="Inject unattend.xml (OOBE skip, locale, BitLocker disable)"
                            FontFamily="Segoe UI" FontSize="12" />
             </CheckBox>
-            <CheckBox IsChecked="{Binding InjectRegistry}"
-                      FontFamily="Segoe UI" FontSize="12"
-                      VerticalContentAlignment="Center"
-                      Margin="0,0,0,4">
-                <TextBlock Text="Inject registry (disable store auto-update, consumer features)"
-                           FontFamily="Segoe UI" FontSize="12" />
-            </CheckBox>
-            <TextBlock FontFamily="Segoe UI" FontSize="11"
-                       Foreground="{StaticResource BrTextGray}"
-                       Margin="20,2,0,0"
-                       TextWrapping="Wrap"
-                       Text="Unattend: OOBE skip, temp user → SetupComplete: Administrator有効化+自動ログオン, testユーザー削除, タスク無効化. Registry: Store自動更新停止, ConsumerFeatures無効." />
+
+            <!-- SetupComplete Commands -->
+            <TextBlock Text="SetupComplete Commands" Style="{StaticResource FormLabelStyle}"
+                       FontWeight="Bold" Margin="0,4,0,6" />
+            <Border Background="White" BorderBrush="{StaticResource BrBorder}"
+                    BorderThickness="1" MaxHeight="200">
+                <DataGrid x:Name="SetupCommandsGrid"
+                          ItemsSource="{Binding SetupCommands}"
+                          AutoGenerateColumns="False"
+                          SelectionMode="Single"
+                          HeadersVisibility="Column"
+                          GridLinesVisibility="Horizontal"
+                          BorderThickness="0"
+                          CanUserSortColumns="False"
+                          CanUserReorderColumns="False"
+                          CanUserResizeRows="False"
+                          CanUserAddRows="False"
+                          CanUserDeleteRows="False"
+                          Background="White"
+                          RowBackground="White"
+                          AlternatingRowBackground="#FAFAFA"
+                          FontFamily="Segoe UI" FontSize="11">
+                    <DataGrid.Columns>
+                        <DataGridCheckBoxColumn Header="" Binding="{Binding IsEnabled, UpdateSourceTrigger=PropertyChanged}" Width="30" />
+                        <DataGridTextColumn Header="Description" Binding="{Binding Description, UpdateSourceTrigger=LostFocus}" Width="200" />
+                        <DataGridTextColumn Header="Command" Binding="{Binding Command, UpdateSourceTrigger=LostFocus}" Width="*" />
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Border>
+            <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                <Button Content="Add"
+                        Command="{Binding AddSetupCommandCommand}"
+                        Style="{StaticResource RoundedButtonStyle}"
+                        Background="{StaticResource BrImagePrepBtn}"
+                        Padding="14,3" Margin="0,0,6,0" />
+                <Button Content="Remove"
+                        Command="{Binding RemoveSetupCommandCommand}"
+                        CommandParameter="{Binding SelectedItem, ElementName=SetupCommandsGrid}"
+                        Style="{StaticResource RoundedButtonStyle}"
+                        Background="{StaticResource BrExecBtn}"
+                        Padding="14,3" Margin="0,0,6,0" />
+                <Button Content="Save"
+                        Command="{Binding SaveCommandsCommand}"
+                        Style="{StaticResource RoundedButtonStyle}"
+                        Background="{StaticResource BrImagePrepBtn}"
+                        Padding="14,3" />
+            </StackPanel>
         </StackPanel>
 
         <!-- Progress -->

@@ -32,5 +32,5 @@ public interface IWindowsImageService
     /// Both operations share a single mount/unmount cycle for performance.
     /// </summary>
     Task CustomizeWimAsync(string wimPath, string? unattendXml, string? setupCompleteCmd,
-        bool injectRegistry, IProgress<string>? progress = null, CancellationToken ct = default);
+        IProgress<string>? progress = null, CancellationToken ct = default);
 }

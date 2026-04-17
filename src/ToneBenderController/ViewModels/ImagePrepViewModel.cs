@@ -1,5 +1,7 @@
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -18,7 +20,14 @@ public partial class ImagePrepViewModel : ObservableObject
     private CancellationTokenSource? _exportCts;
     private string? _wimFilePath;
 
+    private static readonly JsonSerializerOptions s_jsonOptions = new()
+    {
+        WriteIndented = true,
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+    };
+
     public ObservableCollection<WimEdition> Editions { get; } = [];
+    public ObservableCollection<SetupCommand> SetupCommands { get; } = [];
 
     [ObservableProperty]
     private string _isoFilePath = "";
@@ -53,12 +62,10 @@ public partial class ImagePrepViewModel : ObservableObject
     [ObservableProperty]
     private bool _injectUnattend;
 
-    [ObservableProperty]
-    private bool _injectRegistry;
-
     public ImagePrepViewModel(IWindowsImageService imageService)
     {
         _imageService = imageService;
+        LoadSetupCommands();
     }
 
     partial void OnSelectedEditionChanged(WimEdition? value)
@@ -71,6 +78,100 @@ public partial class ImagePrepViewModel : ObservableObject
 
         OutputFileName = SanitizeFileName(value.Name) + ".wim";
     }
+
+    // ── Setup Commands management ────────────────────────────────
+
+    private static string GetSetupCommandsPath()
+    {
+        string appDir = AppContext.BaseDirectory;
+        // Walk up to find Profiles directory (handles both dev and publish layouts)
+        string? dir = appDir;
+        while (dir != null)
+        {
+            string profilesDir = Path.Combine(dir, "Profiles");
+            if (Directory.Exists(profilesDir))
+                return Path.Combine(profilesDir, "setup-commands.json");
+            dir = Path.GetDirectoryName(dir);
+        }
+        // Fallback: next to executable
+        return Path.Combine(appDir, "Profiles", "setup-commands.json");
+    }
+
+    private void LoadSetupCommands()
+    {
+        SetupCommands.Clear();
+
+        string path = GetSetupCommandsPath();
+        if (File.Exists(path))
+        {
+            try
+            {
+                string json = File.ReadAllText(path);
+                var commands = JsonSerializer.Deserialize<List<SetupCommand>>(json);
+                if (commands != null)
+                {
+                    foreach (var cmd in commands)
+                        SetupCommands.Add(cmd);
+                    return;
+                }
+            }
+            catch
+            {
+                // Fall through to defaults
+            }
+        }
+
+        // Load defaults if file missing or parse failed
+        foreach (var cmd in GetDefaultSetupCommands())
+            SetupCommands.Add(cmd);
+
+        SaveSetupCommands();
+    }
+
+    private void SaveSetupCommands()
+    {
+        try
+        {
+            string path = GetSetupCommandsPath();
+            string? dir = Path.GetDirectoryName(path);
+            if (!string.IsNullOrEmpty(dir))
+                Directory.CreateDirectory(dir);
+
+            string json = JsonSerializer.Serialize(SetupCommands.ToList(), s_jsonOptions);
+            File.WriteAllText(path, json);
+        }
+        catch
+        {
+            // Best-effort save
+        }
+    }
+
+    [RelayCommand]
+    private void AddSetupCommand()
+    {
+        SetupCommands.Add(new SetupCommand
+        {
+            Description = "New command",
+            IsEnabled = true,
+            Command = ""
+        });
+        SaveSetupCommands();
+    }
+
+    [RelayCommand]
+    private void RemoveSetupCommand(SetupCommand? command)
+    {
+        if (command != null && SetupCommands.Remove(command))
+            SaveSetupCommands();
+    }
+
+    [RelayCommand]
+    private void SaveCommands()
+    {
+        SaveSetupCommands();
+    }
+
+    // ── ISO / Edition browsing ───────────────────────────────────
 
     [RelayCommand]
     private async Task BrowseIsoAsync()
@@ -176,6 +277,8 @@ public partial class ImagePrepViewModel : ObservableObject
             OutputDirectory = dialog.FolderName;
     }
 
+    // ── Export ────────────────────────────────────────────────────
+
     public async Task<bool> ExportAsync()
     {
         if (SelectedEdition is null || _wimFilePath is null || IsExporting)
@@ -192,6 +295,9 @@ public partial class ImagePrepViewModel : ObservableObject
             StatusText = "No output filename specified.";
             return false;
         }
+
+        // Save latest toggle states before export
+        SaveSetupCommands();
 
         IsExporting = true;
         ExportProgress = 0;
@@ -230,16 +336,17 @@ public partial class ImagePrepViewModel : ObservableObject
                     destPath, DriverDirectory, driverProgress, _exportCts.Token);
             }
 
-            // Customize WIM (unattend + registry) in a single mount
-            if (InjectUnattend || InjectRegistry)
+            // Customize WIM (unattend + SetupComplete) in a single mount
+            bool hasSetupCommands = SetupCommands.Any(c => c.IsEnabled);
+
+            if (InjectUnattend || hasSetupCommands)
             {
                 StatusText = "Customizing WIM...";
                 var customizeProgress = new Progress<string>(msg => StatusText = msg);
                 await _imageService.CustomizeWimAsync(
                     destPath,
                     InjectUnattend ? GenerateUnattendXml() : null,
-                    InjectUnattend ? GenerateSetupCompleteCmd() : null,
-                    InjectRegistry,
+                    hasSetupCommands ? GenerateSetupCompleteCmd() : null,
                     customizeProgress,
                     _exportCts.Token);
             }
@@ -313,31 +420,25 @@ public partial class ImagePrepViewModel : ObservableObject
         return Regex.Replace(name, @"[^\w\-.()]", "_");
     }
 
-    private static string GenerateSetupCompleteCmd()
+    private string GenerateSetupCompleteCmd()
     {
-        return """
-            @echo off
-            echo [1/5] Enabling built-in Administrator...
-            net user Administrator /active:yes
+        var sb = new StringBuilder();
+        sb.AppendLine("@echo off");
 
-            echo [2/5] Setting Administrator auto-logon...
-            reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v AutoAdminLogon /t REG_SZ /d "1" /f
-            reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v DefaultUserName /t REG_SZ /d "Administrator" /f
-            reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v DefaultPassword /t REG_SZ /d "" /f
+        var enabled = SetupCommands.Where(c => c.IsEnabled).ToList();
+        int total = enabled.Count;
+        int step = 0;
 
-            echo [3/5] Deleting temporary user 'test'...
-            net user test /delete
+        foreach (var cmd in enabled)
+        {
+            step++;
+            sb.AppendLine($"echo [{step}/{total}] {cmd.Description}...");
+            sb.AppendLine(cmd.Command);
+            sb.AppendLine();
+        }
 
-            echo [4/5] Disabling scheduled task...
-            schtasks /change /disable /tn "\Microsoft\Windows\AppxDeploymentClient\Pre-staged app cleanup" >nul 2>&1
-
-            echo [5/5] Setting Japanese 106/109 keyboard layout...
-            reg add "HKLM\SYSTEM\CurrentControlSet\Services\i8042prt\Parameters" /v "LayerDriver JPN" /t REG_SZ /d "kbd106.dll" /f
-            reg add "HKLM\SYSTEM\CurrentControlSet\Services\i8042prt\Parameters" /v "OverrideKeyboardSubtype" /t REG_DWORD /d 2 /f
-
-            echo SetupComplete finished. Restarting to apply keyboard layout...
-            shutdown /r /t 3
-            """;
+        sb.AppendLine("echo SetupComplete finished.");
+        return sb.ToString();
     }
 
     private static string GenerateUnattendXml()
@@ -389,5 +490,25 @@ public partial class ImagePrepViewModel : ObservableObject
                 </settings>
             </unattend>
             """;
+    }
+
+    private static List<SetupCommand> GetDefaultSetupCommands()
+    {
+        return
+        [
+            new() { Description = "Administrator 有効化", IsEnabled = true, Command = "net user Administrator /active:yes" },
+            new() { Description = "自動ログオン (AutoAdminLogon)", IsEnabled = true, Command = "reg add \"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon\" /v AutoAdminLogon /t REG_SZ /d \"1\" /f" },
+            new() { Description = "自動ログオン (DefaultUserName)", IsEnabled = true, Command = "reg add \"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon\" /v DefaultUserName /t REG_SZ /d \"Administrator\" /f" },
+            new() { Description = "自動ログオン (DefaultPassword)", IsEnabled = true, Command = "reg add \"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon\" /v DefaultPassword /t REG_SZ /d \"\" /f" },
+            new() { Description = "test ユーザー削除", IsEnabled = true, Command = "net user test /delete" },
+            new() { Description = "タスク無効化 (Pre-staged app cleanup)", IsEnabled = true, Command = "schtasks /change /disable /tn \"\\Microsoft\\Windows\\AppxDeploymentClient\\Pre-staged app cleanup\" >nul 2>&1" },
+            new() { Description = "Consumer Features 無効化", IsEnabled = true, Command = "reg add \"HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\CloudContent\" /v DisableWindowsConsumerFeatures /t REG_DWORD /d 1 /f" },
+            new() { Description = "Store 自動更新無効化 (Policy)", IsEnabled = true, Command = "reg add \"HKLM\\SOFTWARE\\Policies\\Microsoft\\WindowsStore\" /v AutoDownload /t REG_DWORD /d 2 /f" },
+            new() { Description = "Store 自動ダウンロード無効化", IsEnabled = true, Command = "reg add \"HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\WindowsStore\\WindowsUpdate\" /v AutoDownload /t REG_DWORD /d 5 /f" },
+            new() { Description = "Store OS アップグレード無効化", IsEnabled = true, Command = "reg add \"HKLM\\SOFTWARE\\Policies\\Microsoft\\WindowsStore\" /v DisableOSUpgrade /t REG_DWORD /d 1 /f" },
+            new() { Description = "日本語キーボード (LayerDriver JPN)", IsEnabled = true, Command = "reg add \"HKLM\\SYSTEM\\CurrentControlSet\\Services\\i8042prt\\Parameters\" /v \"LayerDriver JPN\" /t REG_SZ /d \"kbd106.dll\" /f" },
+            new() { Description = "日本語キーボード (OverrideKeyboardSubtype)", IsEnabled = true, Command = "reg add \"HKLM\\SYSTEM\\CurrentControlSet\\Services\\i8042prt\\Parameters\" /v \"OverrideKeyboardSubtype\" /t REG_DWORD /d 2 /f" },
+            new() { Description = "再起動", IsEnabled = true, Command = "shutdown /r /t 3" },
+        ];
     }
 }

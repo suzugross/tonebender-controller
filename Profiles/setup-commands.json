@@ -1,0 +1,67 @@
+[
+  {
+    "description": "Administrator 有効化",
+    "isEnabled": true,
+    "command": "net user Administrator /active:yes"
+  },
+  {
+    "description": "自動ログオン (AutoAdminLogon)",
+    "isEnabled": true,
+    "command": "reg add \"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon\" /v AutoAdminLogon /t REG_SZ /d \"1\" /f"
+  },
+  {
+    "description": "自動ログオン (DefaultUserName)",
+    "isEnabled": true,
+    "command": "reg add \"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon\" /v DefaultUserName /t REG_SZ /d \"Administrator\" /f"
+  },
+  {
+    "description": "自動ログオン (DefaultPassword)",
+    "isEnabled": true,
+    "command": "reg add \"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon\" /v DefaultPassword /t REG_SZ /d \"\" /f"
+  },
+  {
+    "description": "test ユーザー削除",
+    "isEnabled": true,
+    "command": "net user test /delete"
+  },
+  {
+    "description": "タスク無効化 (Pre-staged app cleanup)",
+    "isEnabled": true,
+    "command": "schtasks /change /disable /tn \"\\Microsoft\\Windows\\AppxDeploymentClient\\Pre-staged app cleanup\" >nul 2>&1"
+  },
+  {
+    "description": "Consumer Features 無効化",
+    "isEnabled": true,
+    "command": "reg add \"HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\CloudContent\" /v DisableWindowsConsumerFeatures /t REG_DWORD /d 1 /f"
+  },
+  {
+    "description": "Store 自動更新無効化 (Policy)",
+    "isEnabled": true,
+    "command": "reg add \"HKLM\\SOFTWARE\\Policies\\Microsoft\\WindowsStore\" /v AutoDownload /t REG_DWORD /d 2 /f"
+  },
+  {
+    "description": "Store 自動ダウンロード無効化",
+    "isEnabled": true,
+    "command": "reg add \"HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\WindowsStore\\WindowsUpdate\" /v AutoDownload /t REG_DWORD /d 5 /f"
+  },
+  {
+    "description": "Store OS アップグレード無効化",
+    "isEnabled": true,
+    "command": "reg add \"HKLM\\SOFTWARE\\Policies\\Microsoft\\WindowsStore\" /v DisableOSUpgrade /t REG_DWORD /d 1 /f"
+  },
+  {
+    "description": "日本語キーボード (LayerDriver JPN)",
+    "isEnabled": true,
+    "command": "reg add \"HKLM\\SYSTEM\\CurrentControlSet\\Services\\i8042prt\\Parameters\" /v \"LayerDriver JPN\" /t REG_SZ /d \"kbd106.dll\" /f"
+  },
+  {
+    "description": "日本語キーボード (OverrideKeyboardSubtype)",
+    "isEnabled": true,
+    "command": "reg add \"HKLM\\SYSTEM\\CurrentControlSet\\Services\\i8042prt\\Parameters\" /v \"OverrideKeyboardSubtype\" /t REG_DWORD /d 2 /f"
+  },
+  {
+    "description": "再起動",
+    "isEnabled": true,
+    "command": "shutdown /r /t 3"
+  }
+]
