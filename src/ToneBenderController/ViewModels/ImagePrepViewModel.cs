@@ -28,6 +28,10 @@ public partial class ImagePrepViewModel : ObservableObject
 
     public ObservableCollection<WimEdition> Editions { get; } = [];
     public ObservableCollection<SetupCommand> SetupCommands { get; } = [];
+    public ObservableCollection<string> AvailablePresets { get; } = [];
+
+    [ObservableProperty]
+    private string _selectedPreset = "default";
 
     [ObservableProperty]
     private string _isoFilePath = "";
@@ -65,7 +69,14 @@ public partial class ImagePrepViewModel : ObservableObject
     public ImagePrepViewModel(IWindowsImageService imageService)
     {
         _imageService = imageService;
+        RefreshPresets();
         LoadSetupCommands();
+    }
+
+    partial void OnSelectedPresetChanged(string value)
+    {
+        if (!string.IsNullOrEmpty(value))
+            LoadSetupCommands();
     }
 
     partial void OnSelectedEditionChanged(WimEdition? value)
@@ -81,27 +92,56 @@ public partial class ImagePrepViewModel : ObservableObject
 
     // ── Setup Commands management ────────────────────────────────
 
-    private static string GetSetupCommandsPath()
+    private static string GetSetupCommandsDir()
     {
         string appDir = AppContext.BaseDirectory;
-        // Walk up to find Profiles directory (handles both dev and publish layouts)
         string? dir = appDir;
         while (dir != null)
         {
             string profilesDir = Path.Combine(dir, "Profiles");
             if (Directory.Exists(profilesDir))
-                return Path.Combine(profilesDir, "setup-commands.json");
+                return Path.Combine(profilesDir, "SetupCommands");
             dir = Path.GetDirectoryName(dir);
         }
-        // Fallback: next to executable
-        return Path.Combine(appDir, "Profiles", "setup-commands.json");
+        return Path.Combine(appDir, "Profiles", "SetupCommands");
+    }
+
+    private void RefreshPresets()
+    {
+        string dir = GetSetupCommandsDir();
+        Directory.CreateDirectory(dir);
+
+        // Migrate legacy setup-commands.json if it exists
+        string legacyPath = Path.Combine(Directory.GetParent(dir)!.FullName, "setup-commands.json");
+        string defaultPath = Path.Combine(dir, "default.json");
+        if (File.Exists(legacyPath) && !File.Exists(defaultPath))
+        {
+            File.Move(legacyPath, defaultPath);
+        }
+
+        // Ensure default.json exists
+        if (!File.Exists(defaultPath))
+        {
+            string json = JsonSerializer.Serialize(GetDefaultSetupCommands(), s_jsonOptions);
+            File.WriteAllText(defaultPath, json);
+        }
+
+        string previous = SelectedPreset;
+        AvailablePresets.Clear();
+        foreach (string file in Directory.GetFiles(dir, "*.json").OrderBy(f => f))
+            AvailablePresets.Add(Path.GetFileNameWithoutExtension(file));
+
+        if (AvailablePresets.Contains(previous))
+            SelectedPreset = previous;
+        else if (AvailablePresets.Count > 0)
+            SelectedPreset = AvailablePresets[0];
     }
 
     private void LoadSetupCommands()
     {
         SetupCommands.Clear();
 
-        string path = GetSetupCommandsPath();
+        string path = Path.Combine(GetSetupCommandsDir(), $"{SelectedPreset}.json");
         if (File.Exists(path))
         {
             try
@@ -115,35 +155,24 @@ public partial class ImagePrepViewModel : ObservableObject
                     return;
                 }
             }
-            catch
-            {
-                // Fall through to defaults
-            }
+            catch { /* fall through */ }
         }
 
-        // Load defaults if file missing or parse failed
         foreach (var cmd in GetDefaultSetupCommands())
             SetupCommands.Add(cmd);
-
-        SaveSetupCommands();
     }
 
     private void SaveSetupCommands()
     {
         try
         {
-            string path = GetSetupCommandsPath();
-            string? dir = Path.GetDirectoryName(path);
-            if (!string.IsNullOrEmpty(dir))
-                Directory.CreateDirectory(dir);
-
+            string dir = GetSetupCommandsDir();
+            Directory.CreateDirectory(dir);
+            string path = Path.Combine(dir, $"{SelectedPreset}.json");
             string json = JsonSerializer.Serialize(SetupCommands.ToList(), s_jsonOptions);
             File.WriteAllText(path, json);
         }
-        catch
-        {
-            // Best-effort save
-        }
+        catch { /* best-effort */ }
     }
 
     [RelayCommand]
@@ -169,6 +198,49 @@ public partial class ImagePrepViewModel : ObservableObject
     private void SaveCommands()
     {
         SaveSetupCommands();
+    }
+
+    [RelayCommand]
+    private void SaveAsPreset()
+    {
+        var sfd = new SaveFileDialog
+        {
+            Title = "Save Preset As",
+            Filter = "JSON Files (*.json)|*.json",
+            InitialDirectory = GetSetupCommandsDir(),
+            FileName = "new-preset.json"
+        };
+
+        if (sfd.ShowDialog() == true)
+        {
+            string name = Path.GetFileNameWithoutExtension(sfd.FileName);
+            string dir = GetSetupCommandsDir();
+            string path = Path.Combine(dir, $"{name}.json");
+
+            try
+            {
+                string json = JsonSerializer.Serialize(SetupCommands.ToList(), s_jsonOptions);
+                File.WriteAllText(path, json);
+
+                RefreshPresets();
+                SelectedPreset = name;
+            }
+            catch { /* best-effort */ }
+        }
+    }
+
+    [RelayCommand]
+    private void DeletePreset()
+    {
+        if (SelectedPreset == "default") return;
+
+        string path = Path.Combine(GetSetupCommandsDir(), $"{SelectedPreset}.json");
+        if (File.Exists(path))
+        {
+            try { File.Delete(path); } catch { return; }
+        }
+
+        RefreshPresets();
     }
 
     // ── ISO / Edition browsing ───────────────────────────────────

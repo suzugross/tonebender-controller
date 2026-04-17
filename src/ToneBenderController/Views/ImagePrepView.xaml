@@ -3,11 +3,12 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              Background="{StaticResource BrImagePrepBg}">
 
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
     <Grid Margin="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -48,7 +49,8 @@
         <!-- Editions DataGrid -->
         <Border Grid.Row="2" Background="White"
                 BorderBrush="{StaticResource BrBorder}"
-                BorderThickness="1" Margin="0,0,0,12">
+                BorderThickness="1" Margin="0,0,0,12"
+                MinHeight="120" MaxHeight="200">
             <DataGrid ItemsSource="{Binding Editions}"
                       SelectedItem="{Binding SelectedEdition}"
                       AutoGenerateColumns="False"
@@ -156,6 +158,22 @@
             <!-- SetupComplete Commands -->
             <TextBlock Text="SetupComplete Commands" Style="{StaticResource FormLabelStyle}"
                        FontWeight="Bold" Margin="0,4,0,6" />
+            <DockPanel Margin="0,0,0,6">
+                <Button DockPanel.Dock="Right" Content="Delete"
+                        Command="{Binding DeletePresetCommand}"
+                        Style="{StaticResource RoundedButtonStyle}"
+                        Background="{StaticResource BrExecBtn}"
+                        Padding="10,3" Margin="6,0,0,0" />
+                <Button DockPanel.Dock="Right" Content="Save As..."
+                        Command="{Binding SaveAsPresetCommand}"
+                        Style="{StaticResource RoundedButtonStyle}"
+                        Background="{StaticResource BrImagePrepBtn}"
+                        Padding="10,3" Margin="6,0,0,0" />
+                <ComboBox ItemsSource="{Binding AvailablePresets}"
+                          SelectedItem="{Binding SelectedPreset}"
+                          Style="{StaticResource FormComboBoxStyle}"
+                          MinWidth="160" />
+            </DockPanel>
             <Border Background="White" BorderBrush="{StaticResource BrBorder}"
                     BorderThickness="1" MaxHeight="200">
                 <DataGrid x:Name="SetupCommandsGrid"
@@ -218,4 +236,5 @@
             </StackPanel>
         </Border>
     </Grid>
+    </ScrollViewer>
 </UserControl>
