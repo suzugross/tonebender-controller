@@ -32,10 +32,32 @@ public class PowerShellService : IPowerShellService
         if (!string.IsNullOrEmpty(driverPath))
             args += $" -DriverPath \"{driverPath}\"";
 
+        await RunPsScriptAsync(args, progress, ct);
+    }
+
+    public async Task RunRegenerateIsoAsync(
+        string workspaceDir,
+        string isoPath,
+        IProgress<BuildProgress>? progress = null,
+        CancellationToken ct = default)
+    {
+        var scriptPath = Path.Combine(ScriptDir, "regenerate-pe-iso.ps1");
+
+        var args = $"-NoProfile -ExecutionPolicy Bypass -File \"{scriptPath}\" " +
+                   $"-WorkDir \"{workspaceDir}\" -IsoPath \"{isoPath}\"";
+
+        await RunPsScriptAsync(args, progress, ct);
+    }
+
+    private static async Task RunPsScriptAsync(
+        string arguments,
+        IProgress<BuildProgress>? progress,
+        CancellationToken ct)
+    {
         var psi = new ProcessStartInfo
         {
             FileName = "powershell.exe",
-            Arguments = args,
+            Arguments = arguments,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
@@ -47,7 +69,6 @@ public class PowerShellService : IPowerShellService
         using var process = Process.Start(psi)
             ?? throw new InvalidOperationException("Failed to start PowerShell process.");
 
-        // Parse stdout JSON lines as they arrive
         process.OutputDataReceived += (_, e) =>
         {
             if (e.Data is null) return;
@@ -64,10 +85,8 @@ public class PowerShellService : IPowerShellService
         };
         process.BeginOutputReadLine();
 
-        // Collect stderr for error reporting
         var stderrTask = process.StandardError.ReadToEndAsync(ct);
 
-        // Kill entire process tree on cancellation
         await using var reg = ct.Register(() =>
         {
             try { process.Kill(entireProcessTree: true); } catch { }
@@ -82,7 +101,7 @@ public class PowerShellService : IPowerShellService
         {
             var stderr = await stderrTask;
             throw new InvalidOperationException(
-                $"Build script exited with code {process.ExitCode}.\n{stderr}");
+                $"PowerShell script exited with code {process.ExitCode}.\n{stderr}");
         }
     }
 

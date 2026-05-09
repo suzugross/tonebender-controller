@@ -9,7 +9,8 @@ using ToneBenderController.Services;
 namespace ToneBenderController.ViewModels;
 
 /// <summary>
-/// USB drive selection, WinPE build, and deploy — unified pipeline.
+/// USB drive selection, WinPE build, deploy, and per-stage variants
+/// (PartitionOnly / BuildOnly / DriverOnly).
 /// </summary>
 public partial class WinPeBuildViewModel : ObservableObject
 {
@@ -19,7 +20,19 @@ public partial class WinPeBuildViewModel : ObservableObject
     private readonly string _profilesDir;
     private CancellationTokenSource? _buildCts;
 
-    // ── USB Drive ──
+    // ── Mode selection ──
+    public ObservableCollection<BuildModeOption> AvailableModes { get; } =
+    [
+        new("Full pipeline (Partition + Build + Deploy)", BuildMode.Full),
+        new("Partition USB only", BuildMode.PartitionOnly),
+        new("Build PE only (to folder)", BuildMode.BuildOnly),
+        new("Apply drivers to existing PE", BuildMode.DriverOnly),
+    ];
+
+    [ObservableProperty]
+    private BuildMode _mode = BuildMode.Full;
+
+    // ── USB Drive (Full / PartitionOnly) ──
     public ObservableCollection<UsbDriveInfo> UsbDrives { get; } = [];
 
     [ObservableProperty]
@@ -28,7 +41,7 @@ public partial class WinPeBuildViewModel : ObservableObject
     [ObservableProperty]
     private int _winPeSizeMB = 4096;
 
-    // ── Build Profile ──
+    // ── Build Profile (Full / BuildOnly) ──
     public ObservableCollection<string> AvailableProfiles { get; } = [];
     public ObservableCollection<BuildLogEntry> BuildLog { get; } = [];
 
@@ -50,8 +63,23 @@ public partial class WinPeBuildViewModel : ObservableObject
     [ObservableProperty]
     private string _profileDetail = "";
 
+    // ── OEM Drivers (Full / DriverOnly) ──
     [ObservableProperty]
     private string _driverDirectory = "";
+
+    // ── BuildOnly: output folder + ISO toggle ──
+    [ObservableProperty]
+    private string _buildOutputDirectory = "";
+
+    [ObservableProperty]
+    private bool _buildGenerateIso;
+
+    // ── DriverOnly: existing workspace + ISO regen toggle ──
+    [ObservableProperty]
+    private string _workspacePath = "";
+
+    [ObservableProperty]
+    private bool _driverRegenerateIso;
 
     public WinPeBuildViewModel(
         IProfileService profileService,
@@ -133,9 +161,35 @@ public partial class WinPeBuildViewModel : ObservableObject
         DriverDirectory = "";
     }
 
+    // ── BuildOnly output folder ──
+
+    [RelayCommand]
+    private void BrowseBuildOutputDirectory()
+    {
+        var dialog = new OpenFolderDialog
+        {
+            Title = "Select Build Output Directory (workspace will be created here)"
+        };
+        if (dialog.ShowDialog() == true)
+            BuildOutputDirectory = dialog.FolderName;
+    }
+
+    // ── DriverOnly workspace ──
+
+    [RelayCommand]
+    private void BrowseWorkspacePath()
+    {
+        var dialog = new OpenFolderDialog
+        {
+            Title = "Select existing WinPE workspace (must contain media\\sources\\boot.wim)"
+        };
+        if (dialog.ShowDialog() == true)
+            WorkspacePath = dialog.FolderName;
+    }
+
     // ── Build ──
 
-    public async Task<bool> RunBuildAsync()
+    public async Task<bool> RunBuildAsync(BuildOverrides? overrides = null)
     {
         if (SelectedProfile is null || IsBuilding) return false;
 
@@ -155,9 +209,27 @@ public partial class WinPeBuildViewModel : ObservableObject
             BuildLog.Add(new BuildLogEntry(bp.Time, bp.Message, bp.Status));
         });
 
+        var profilePath = Path.Combine(_profilesDir, SelectedProfile + ".json");
+        string? tempProfilePath = null;
+
         try
         {
-            var profilePath = Path.Combine(_profilesDir, SelectedProfile + ".json");
+            // If overrides are present, write a temp profile that the PS1 consumes.
+            // The original profile file is never touched.
+            if (overrides is not null)
+            {
+                var profile = await _profileService.LoadAsync(profilePath);
+                if (overrides.WorkDir is not null) profile.WorkDir = overrides.WorkDir;
+                if (overrides.IsoPath is not null) profile.Output.IsoPath = overrides.IsoPath;
+                if (overrides.GenerateIso.HasValue) profile.Output.Iso = overrides.GenerateIso.Value;
+
+                tempProfilePath = Path.Combine(
+                    Path.GetTempPath(),
+                    $"tonebender_{Guid.NewGuid():N}.json");
+                await _profileService.SaveAsync(tempProfilePath, profile);
+                profilePath = tempProfilePath;
+            }
+
             string? driverPath = string.IsNullOrEmpty(DriverDirectory) ? null : DriverDirectory;
             await _psService.RunBuildAsync(profilePath, driverPath, progress, _buildCts.Token);
 
@@ -188,7 +260,36 @@ public partial class WinPeBuildViewModel : ObservableObject
             IsBuilding = false;
             _buildCts.Dispose();
             _buildCts = null;
+
+            if (tempProfilePath is not null && File.Exists(tempProfilePath))
+            {
+                try { File.Delete(tempProfilePath); } catch { /* swallow */ }
+            }
         }
+    }
+
+    public CancellationToken BeginExternalOperation()
+    {
+        IsBuilding = true;
+        BuildProgress = 0;
+        BuildLog.Clear();
+        _buildCts = new CancellationTokenSource();
+        return _buildCts.Token;
+    }
+
+    public void EndExternalOperation()
+    {
+        IsBuilding = false;
+        _buildCts?.Dispose();
+        _buildCts = null;
+    }
+
+    public void ReportExternalProgress(string message, string status, int? progressPercent = null)
+    {
+        BuildStatus = message;
+        if (progressPercent.HasValue) BuildProgress = progressPercent.Value;
+        BuildLog.Add(new BuildLogEntry(
+            DateTime.Now.ToString("HH:mm:ss"), message, status));
     }
 
     public void CancelBuild()

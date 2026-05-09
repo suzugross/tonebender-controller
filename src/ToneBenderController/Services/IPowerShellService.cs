@@ -13,4 +13,8 @@ public interface IPowerShellService
     /// <summary>Run the WinPE build script with the specified profile.</summary>
     Task RunBuildAsync(string profilePath, string? driverPath = null,
         IProgress<BuildProgress>? progress = null, CancellationToken ct = default);
+
+    /// <summary>Regenerate a WinPE ISO from an existing workspace (Driver-only mode).</summary>
+    Task RunRegenerateIsoAsync(string workspaceDir, string isoPath,
+        IProgress<BuildProgress>? progress = null, CancellationToken ct = default);
 }

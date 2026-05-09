@@ -27,9 +27,22 @@ DI-wired with `Microsoft.Extensions.DependencyInjection`. Three tabs, each with 
 
 | Tab | ViewModel | Pipeline |
 |---|---|---|
-| **WinPE USB Builder** (blue) | `WinPeBuildViewModel` | ① diskpart → WINPE(FAT32) + DATA(NTFS) → ② `tonebender.ps1` → ③ `robocopy /MIR media\ → WINPE:` |
+| **WinPE USB Builder** (blue) | `WinPeBuildViewModel` | Mode-driven (see below) |
 | **ToneBender Config** (orange) | `ToneBenderConfigViewModel` | Edit `autopilot.json` (displayTitle, imageFile, postAction, targetDisk, wimIndex, dataPartitionMB) |
 | **Image Prep** (purple) | `ImagePrepViewModel` | Mount Windows ISO → enumerate WIM editions → `DISM /Export-Image` single edition → optional driver / unattend.xml / SetupComplete.cmd injection |
+
+### WinPE USB Builder Modes (`BuildMode` enum)
+
+Single tab with a Mode ComboBox at top. `MainViewModel.DispatchWinPeAsync` dispatches by `WinPeBuildViewModel.Mode`:
+
+| Mode | Action | Required input |
+|---|---|---|
+| `Full` (default) | Partition USB → Build PE → Deploy to USB (the original unified flow) | USB drive + profile + (optional) drivers |
+| `PartitionOnly` | diskpart only — produces WINPE+DATA layout with `[IMAGE]\` and `capture-config.json` template on DATA | USB drive |
+| `BuildOnly` | Build PE workspace into a user-specified folder. ISO generation is opt-in (default OFF). Profile overrides applied via temp JSON in `%TEMP%`. | Profile + output folder |
+| `DriverOnly` | DISM-mount existing `<workspace>\media\sources\boot.wim`, inject drivers, optionally regenerate ISO via `regenerate-pe-iso.ps1`. ISO regen default OFF. **Workspace input only — USB-only PEs are out of scope.** | Workspace folder + driver folder |
+
+Drive-root paths are refused for `BuildOnly` (the engine clears the target dir via `Remove-Item -Recurse -Force`).
 
 ### Services (`src/ToneBenderController/Services/`)
 
@@ -40,7 +53,12 @@ DI-wired with `Microsoft.Extensions.DependencyInjection`. Three tabs, each with 
 | `PowerShellService` | Spawn `tonebender.ps1`, parse stdout JSON lines into `BuildProgress`, kill process tree on cancel |
 | `ProfileService` / `AutopilotService` | Read/write `Profiles/*.json` and `autopilot.json` (camelCase) |
 
-### PowerShell Engine (`tonebender.ps1` + `Modules/`)
+### PowerShell Engine
+
+| Script | Role |
+|---|---|
+| `tonebender.ps1` | Full 8-step build pipeline (used by Full and BuildOnly modes) |
+| `regenerate-pe-iso.ps1` | ISO-only regeneration from existing workspace (used by DriverOnly mode when ISO regen is enabled) |
 
 | Module | Responsibility |
 |---|---|

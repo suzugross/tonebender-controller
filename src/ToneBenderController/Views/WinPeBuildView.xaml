@@ -6,10 +6,69 @@
 
     <UserControl.Resources>
         <conv:StatusToColorConverter x:Key="StatusToColorConverter" />
+
+        <!-- Visible when Mode = Full or PartitionOnly -->
+        <Style x:Key="ShowOnFullOrPartition" TargetType="FrameworkElement">
+            <Setter Property="Visibility" Value="Collapsed" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Mode}" Value="Full">
+                    <Setter Property="Visibility" Value="Visible" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Mode}" Value="PartitionOnly">
+                    <Setter Property="Visibility" Value="Visible" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Visible when Mode = Full or BuildOnly -->
+        <Style x:Key="ShowOnFullOrBuild" TargetType="FrameworkElement">
+            <Setter Property="Visibility" Value="Collapsed" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Mode}" Value="Full">
+                    <Setter Property="Visibility" Value="Visible" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Mode}" Value="BuildOnly">
+                    <Setter Property="Visibility" Value="Visible" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Hidden only when Mode = PartitionOnly (drivers apply to Full/BuildOnly/DriverOnly) -->
+        <Style x:Key="HideOnPartitionOnly" TargetType="FrameworkElement">
+            <Setter Property="Visibility" Value="Visible" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Mode}" Value="PartitionOnly">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Visible only when Mode = BuildOnly -->
+        <Style x:Key="ShowOnBuildOnly" TargetType="FrameworkElement">
+            <Setter Property="Visibility" Value="Collapsed" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Mode}" Value="BuildOnly">
+                    <Setter Property="Visibility" Value="Visible" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Visible only when Mode = DriverOnly -->
+        <Style x:Key="ShowOnDriverOnly" TargetType="FrameworkElement">
+            <Setter Property="Visibility" Value="Collapsed" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Mode}" Value="DriverOnly">
+                    <Setter Property="Visibility" Value="Visible" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
     </UserControl.Resources>
 
     <Grid Margin="16">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -24,8 +83,20 @@
                    Style="{StaticResource SectionHeaderStyle}"
                    Foreground="{StaticResource BrWinPeHeader}" />
 
-        <!-- Target Drive + Partition Layout -->
-        <StackPanel Grid.Row="1" Margin="0,0,0,8">
+        <!-- Mode selector -->
+        <StackPanel Grid.Row="1" Margin="0,0,0,12">
+            <TextBlock Text="Mode" Style="{StaticResource FormLabelStyle}"
+                       FontWeight="Bold" Margin="0,0,0,6" />
+            <ComboBox ItemsSource="{Binding AvailableModes}"
+                      DisplayMemberPath="Display"
+                      SelectedValuePath="Mode"
+                      SelectedValue="{Binding Mode}"
+                      Style="{StaticResource FormComboBoxStyle}" />
+        </StackPanel>
+
+        <!-- Target Drive + Partition Layout (Full / PartitionOnly) -->
+        <StackPanel Grid.Row="2" Margin="0,0,0,8"
+                    Style="{StaticResource ShowOnFullOrPartition}">
             <TextBlock Text="Target Drive" Style="{StaticResource FormLabelStyle}"
                        FontWeight="Bold" Margin="0,0,0,6" />
             <Grid Margin="0,0,0,8">
@@ -79,8 +150,9 @@
             </Border>
         </StackPanel>
 
-        <!-- Build Profile -->
-        <StackPanel Grid.Row="2" Margin="0,0,0,8">
+        <!-- Build Profile (Full / BuildOnly) -->
+        <StackPanel Grid.Row="3" Margin="0,0,0,8"
+                    Style="{StaticResource ShowOnFullOrBuild}">
             <TextBlock Text="Build Profile" Style="{StaticResource FormLabelStyle}"
                        FontWeight="Bold" Margin="0,0,0,6" />
             <ComboBox ItemsSource="{Binding AvailableProfiles}"
@@ -92,8 +164,63 @@
                        Margin="0,4,0,0" />
         </StackPanel>
 
-        <!-- OEM Drivers -->
-        <StackPanel Grid.Row="3" Margin="0,0,0,8">
+        <!-- Build Output Directory (BuildOnly) -->
+        <StackPanel Grid.Row="4" Margin="0,0,0,8"
+                    Style="{StaticResource ShowOnBuildOnly}">
+            <TextBlock Text="Output Directory (workspace)" Style="{StaticResource FormLabelStyle}"
+                       FontWeight="Bold" Margin="0,0,0,6" />
+            <DockPanel>
+                <Button DockPanel.Dock="Right" Content="Browse..."
+                        Command="{Binding BrowseBuildOutputDirectoryCommand}"
+                        Style="{StaticResource RoundedButtonStyle}"
+                        Background="{StaticResource BrWinPeBtn}"
+                        Padding="10,4" Margin="4,0,0,0" />
+                <TextBox Text="{Binding BuildOutputDirectory}"
+                         Style="{StaticResource FormTextBoxStyle}"
+                         IsReadOnly="True" />
+            </DockPanel>
+            <CheckBox IsChecked="{Binding BuildGenerateIso}"
+                      FontFamily="Segoe UI" FontSize="12"
+                      Margin="0,6,0,0">
+                <TextBlock Text="Also generate ISO (next to workspace folder)"
+                           FontFamily="Segoe UI" FontSize="12" />
+            </CheckBox>
+            <TextBlock Text="WARNING: existing contents of the output directory will be deleted."
+                       FontFamily="Segoe UI" FontSize="11" FontStyle="Italic"
+                       Foreground="{StaticResource BrTextGray}"
+                       Margin="0,4,0,0" />
+        </StackPanel>
+
+        <!-- Existing Workspace (DriverOnly) -->
+        <StackPanel Grid.Row="5" Margin="0,0,0,8"
+                    Style="{StaticResource ShowOnDriverOnly}">
+            <TextBlock Text="Existing PE Workspace" Style="{StaticResource FormLabelStyle}"
+                       FontWeight="Bold" Margin="0,0,0,6" />
+            <DockPanel>
+                <Button DockPanel.Dock="Right" Content="Browse..."
+                        Command="{Binding BrowseWorkspacePathCommand}"
+                        Style="{StaticResource RoundedButtonStyle}"
+                        Background="{StaticResource BrWinPeBtn}"
+                        Padding="10,4" Margin="4,0,0,0" />
+                <TextBox Text="{Binding WorkspacePath}"
+                         Style="{StaticResource FormTextBoxStyle}"
+                         IsReadOnly="True" />
+            </DockPanel>
+            <TextBlock Text="Must be a copype workspace containing media\sources\boot.wim."
+                       FontFamily="Segoe UI" FontSize="11" FontStyle="Italic"
+                       Foreground="{StaticResource BrTextGray}"
+                       Margin="0,4,0,0" />
+            <CheckBox IsChecked="{Binding DriverRegenerateIso}"
+                      FontFamily="Segoe UI" FontSize="12"
+                      Margin="0,6,0,0">
+                <TextBlock Text="Regenerate ISO after driver injection"
+                           FontFamily="Segoe UI" FontSize="12" />
+            </CheckBox>
+        </StackPanel>
+
+        <!-- OEM Drivers (Full / BuildOnly / DriverOnly) -->
+        <StackPanel Grid.Row="6" Margin="0,0,0,8"
+                    Style="{StaticResource HideOnPartitionOnly}">
             <TextBlock Text="OEM Drivers" Style="{StaticResource FormLabelStyle}"
                        FontWeight="Bold" Margin="0,0,0,6" />
             <DockPanel>
@@ -127,10 +254,10 @@
             </TextBlock>
         </StackPanel>
 
-        <!-- Build Status -->
-        <TextBlock Grid.Row="4" Text="Build Status" Style="{StaticResource FormLabelStyle}"
+        <!-- Build Status (always visible) -->
+        <TextBlock Grid.Row="7" Text="Status" Style="{StaticResource FormLabelStyle}"
                    FontWeight="Bold" Margin="0,0,0,6" />
-        <Border Grid.Row="5" Background="White" BorderBrush="{StaticResource BrBorder}"
+        <Border Grid.Row="8" Background="White" BorderBrush="{StaticResource BrBorder}"
                 BorderThickness="1" Padding="12,8" Margin="0,0,0,8">
             <StackPanel>
                 <ProgressBar Value="{Binding BuildProgress}"
@@ -147,7 +274,7 @@
         </Border>
 
         <!-- Build Log -->
-        <Border Grid.Row="6" Background="White"
+        <Border Grid.Row="9" Background="White"
                 BorderBrush="{StaticResource BrBorder}"
                 BorderThickness="1">
             <ScrollViewer x:Name="LogScroller"
